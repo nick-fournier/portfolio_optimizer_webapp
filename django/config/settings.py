@@ -100,7 +100,12 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-LOGIN_REDIRECT_URL = "dashboard"
+LOGIN_REDIRECT_URL = "index"
+LOGIN_URL = 'accounts/login/'
+
+
+EMAIL_HOST = "localhost"
+EMAIL_PORT = 1025
 
 # Internationalization
 # https://docs.djangoproject.com/en/3.1/topics/i18n/

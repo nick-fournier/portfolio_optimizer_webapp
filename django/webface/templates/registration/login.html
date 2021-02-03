@@ -1,4 +1,4 @@
-<!--webface/templates/login.html-->
+<!--users/templates/registration/login.html-->
 
 {% extends 'base.html' %}
 
@@ -11,5 +11,6 @@
     <input type="submit" value="Login">
 </form>
 
-<a href="{% url 'dashboard' %}">Back to dashboard</a>
+<a href="{% url 'index' %}">Back to dashboard</a>
+<a href="{% url 'password_reset' %}">Reset password</a>
 {% endblock %}
