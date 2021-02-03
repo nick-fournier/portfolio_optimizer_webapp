@@ -5,7 +5,7 @@ This repo is a Django website for the portfolio optimization platform. Django is
 I haven't set up the database yet, it just uses a sqlite3 as default, but it's pretty easy to use something more robust like postgres. 
 
 
-I created a folder called optimizer. Here we can create whatever code necessary, such as:
+I created a folder called optimizer within the Django folder. Here we can create whatever code necessary, such as:
 
 1. an API script to download the latest stock data, 
 2. a preprocessing algorithm for whatever data cleanup steps necessary, 
