@@ -104,8 +104,14 @@ LOGIN_REDIRECT_URL = "index"
 LOGIN_URL = 'accounts/login/'
 
 
+
 EMAIL_HOST = "localhost"
 EMAIL_PORT = 1025
+# EMAIL_HOST = "smtp.mailgun.org"
+# EMAIL_PORT = 587
+# EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
+# EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
+# EMAIL_USE_TLS = True
 
 # Internationalization
 # https://docs.djangoproject.com/en/3.1/topics/i18n/
