@@ -2,10 +2,10 @@
 
 from django.conf.urls import url, include
 from django.urls import path
-from .views import index
+from .views import index, AddSecurityView
 
 urlpatterns = [
-    # path('', index, name='index'),
-    url(r"^accounts/", include("django.contrib.auth.urls")),
-    url(r"^", index, name="index"),
+    path('', index, name='index'),
+    path('data/add-security', AddSecurityView.as_view(), name='add-security'),
+    path('accounts/', include('django.contrib.auth.urls')),
 ]
