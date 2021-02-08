@@ -4,6 +4,7 @@
 
 {% block content %}
 
+<h3>Add a comma separated list of tickers</h3>
 <form method="post">
     {% csrf_token %}
     {{ form.as_p }}

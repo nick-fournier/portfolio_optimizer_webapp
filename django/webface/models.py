@@ -3,22 +3,22 @@ from django.db import models
 # Create your models here.
 # https://analyzingalpha.com/create-an-equities-database
 
-class Exchange(models.Model):
-    name = models.CharField(max_length=50)
-    acronym = models.CharField(max_length=50)
+# class Exchange(models.Model):
+#     name = models.CharField(max_length=50)
+#     acronym = models.CharField(max_length=50)
 
 class SecurityMeta(models.Model):
-    exchange_id = models.ForeignKey(Exchange, on_delete=models.CASCADE)
-    currency = models.CharField(default=None, max_length=3)
-    symbol = models.CharField(default=None, max_length=12)
-    longname = models.CharField(default=None, max_length=100)           # longName
-    country = models.CharField(default=None, max_length=100)
-    sector = models.CharField(default=None, max_length=50)
-    industry = models.CharField(default=None, max_length=50)
-    category = models.CharField(default=None, max_length=50)
-    company_url = models.CharField(default=None, max_length=100)
-    description = models.CharField(default=None, max_length=1000)       # longBusinessSummary
-    employees = models.IntegerField(default=None)                       # fullTimeEmployees
+    # exchange_id = models.ForeignKey(Exchange, on_delete=models.CASCADE)
+    currency = models.CharField(default=None, null=True, max_length=3)
+    symbol = models.CharField(default=None, null=True, max_length=12)
+    longname = models.CharField(default=None, null=True, max_length=100)
+    country = models.CharField(default=None, null=True, max_length=100)
+    sector = models.CharField(default=None, null=True, max_length=50)
+    industry = models.CharField(default=None, null=True, max_length=50)
+    category = models.CharField(default=None, null=True, max_length=50)
+    company_url = models.CharField(default=None, null=True, max_length=100)
+    employees = models.IntegerField(default=None, null=True,)  # fullTimeEmployees
+    description = models.CharField(default=None, null=True, max_length=2000)       # longBusinessSummary
 
 class SecurityPrice(models.Model):
     security_id = models.ForeignKey(SecurityMeta, on_delete=models.CASCADE)

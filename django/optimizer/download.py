@@ -9,13 +9,6 @@ from ..webface.models import SecurityPrice
 
 
 
-cxchange = []
-security_meta = []
-company = []
-security_price = []
-stock_adjustment = []
-
-
 
 ticker = 'MSFT'
 meta = yf.Ticker("MSFT")
@@ -23,6 +16,8 @@ data = yf.download('MSFT',
                    start='2019-01-01',
                    end='2020-12-31')
 
+
+meta.info.keys()
 
 fin2 = yf.Ticker("TSLA").financials.T
 

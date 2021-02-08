@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h3 class="w3-center">Data</h3>
+
+{% if security_list %}
+    <table>
+        <tr>
+            <th>Name</th>
+        </tr>
+        {% for security in security_list%}
+        <tr>
+            <td>{{security.symbol}}</td>
+        </tr>
+        {% endfor %}
+    </table>
+{% else %}
+    <p class="w3-center">There is nothing here yet...</p>
+{% endif %}
+
+{% endblock %}

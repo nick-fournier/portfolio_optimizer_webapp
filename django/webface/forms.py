@@ -2,6 +2,7 @@ from django import forms
 from django.core import validators
 from django.core.exceptions import ValidationError
 from .models import SecurityMeta
+import yfinance as yf
 
 
 class MinLengthValidator(validators.MinLengthValidator):
@@ -24,6 +25,7 @@ class CommaSeparatedCharField(forms.Field):
             return []
 
         value = [item.strip() for item in value.split(',') if item.strip()]
+
         if self.dedup:
             value = list(set(value))
         return value
@@ -36,5 +38,8 @@ class CommaSeparatedCharField(forms.Field):
 
 
 class AddSecurityForm(forms.Form):
-    tickers = CommaSeparatedCharField()
-    # symbol = forms.CharField()
+    symbols = CommaSeparatedCharField()
+    # symbols = forms.CharField()
+
+
+
