@@ -3,8 +3,8 @@
 {% extends 'base.html' %}
 
 {% block content %}
-
-<h4>Add a comma separated list of stock symbols</h4>
+<h4>Import list of tickers to the portfolio</h4>
+<p>Add a comma separated list of stock symbols</p>
 <form method="post">
     {% csrf_token %}
     {{ form.as_p }}

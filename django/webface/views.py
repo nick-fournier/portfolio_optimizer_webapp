@@ -3,13 +3,15 @@
 from django.urls import reverse_lazy
 from django.apps import apps
 from django.shortcuts import render
-from django.http import HttpResponse
+
 from django.views.generic.edit import CreateView, FormView, UpdateView
 from django.views.generic import TemplateView
-from django.views.generic.detail import DetailView
+
+from datetime import date
 import yfinance as yf
 
-from .models import SecurityMeta, DataSettings
+from .download import DownloadData
+from .models import DataSettings, SecurityMeta, Financials
 from .forms import AddSecurityForm, DataSettingsForm
 
 # Create your views here.
@@ -53,6 +55,7 @@ class AddSecurityView(FormView):
             if not SecurityMeta.objects.filter(symbol=ticker).exists():
                 # Download stock meta data and flatten to lowercase
                 meta = yf.Ticker(ticker).info
+
                 new_keys = [x.lower().replace(' ', '_') for x in meta.keys()]
                 meta = dict(zip(new_keys, meta.values()))
 
@@ -71,12 +74,12 @@ class AddSecurityView(FormView):
                 model = SecurityMeta(**meta)
                 model.save()
 
-                # SecurityMeta.objects.bulk_create(
-                #     SecurityMeta(**vals) for vals in meta#.to_dict('records')
-                # )
 
     def form_valid(self, form):
         symbols = form.cleaned_data['symbols']
-        self.download_meta(symbols)
+
+        # self.download_meta(symbols)
+        for ticker in symbols:
+            DownloadData(ticker)
 
         return super().form_valid(form)
