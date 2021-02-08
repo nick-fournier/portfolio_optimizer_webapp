@@ -1,0 +1,10 @@
+#progress-bar {
+    margin-top: 1em;
+}
+
+label, input {
+    display: block;
+}
+span.helptext {
+    display: none;
+}

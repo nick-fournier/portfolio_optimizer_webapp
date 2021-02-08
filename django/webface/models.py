@@ -16,9 +16,9 @@ class SecurityMeta(models.Model):
     sector = models.CharField(default=None, null=True, max_length=50)
     industry = models.CharField(default=None, null=True, max_length=50)
     category = models.CharField(default=None, null=True, max_length=50)
-    company_url = models.CharField(default=None, null=True, max_length=100)
-    employees = models.IntegerField(default=None, null=True,)  # fullTimeEmployees
-    description = models.CharField(default=None, null=True, max_length=2000)       # longBusinessSummary
+    logo_url = models.CharField(default=None, null=True, max_length=100)
+    fulltime_employees = models.IntegerField(default=None, null=True)  # fullTimeEmployees
+    business_summary = models.CharField(default=None, null=True, max_length=2000)       # longBusinessSummary
 
 class SecurityPrice(models.Model):
     security_id = models.ForeignKey(SecurityMeta, on_delete=models.CASCADE)
