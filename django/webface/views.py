@@ -4,13 +4,13 @@ from django.urls import reverse_lazy
 from django.apps import apps
 from django.shortcuts import render
 from django.http import HttpResponse
-from django.views.generic.edit import CreateView, FormView
+from django.views.generic.edit import CreateView, FormView, UpdateView
 from django.views.generic import TemplateView
 from django.views.generic.detail import DetailView
 import yfinance as yf
 
-from .models import SecurityMeta
-from .forms import CommaSeparatedCharField, AddSecurityForm
+from .models import SecurityMeta, DataSettings
+from .forms import AddSecurityForm, DataSettingsForm
 
 # Create your views here.
 def index(request):
@@ -25,9 +25,22 @@ class DashboardView(TemplateView):
         context['security_list'] = SecurityMeta.objects.all()
         return context
 
+
+class DataSettingsView(UpdateView):
+    model = DataSettings
+    form_class = DataSettingsForm
+    template_name = 'webface/data-settings.html'
+    success_url = reverse_lazy('dashboard')
+
+    def get_context_data(self, **kwargs):
+        context = super(DataSettingsView, self).get_context_data(**kwargs)
+        context['data_settings'] = DataSettings.objects.all()
+        return context
+
+
 class AddSecurityView(FormView):
-    template_name = 'webface/add-security.html'
     form_class = AddSecurityForm
+    template_name = 'webface/add-security.html'
     success_url = reverse_lazy('dashboard')
 
     def download_meta(self, symbols):
@@ -63,7 +76,7 @@ class AddSecurityView(FormView):
                 # )
 
     def form_valid(self, form):
-        symbols = form.cleaned_data['symbols']  # <--- Add this line to get email value
+        symbols = form.cleaned_data['symbols']
         self.download_meta(symbols)
 
         return super().form_valid(form)

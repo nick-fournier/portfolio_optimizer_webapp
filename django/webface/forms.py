@@ -1,7 +1,9 @@
 from django import forms
 from django.core import validators
 from django.core.exceptions import ValidationError
-from .models import SecurityMeta
+from django.forms import ModelForm
+from django.forms.widgets import DateInput
+from .models import SecurityMeta, DataSettings
 import yfinance as yf
 
 
@@ -39,7 +41,13 @@ class CommaSeparatedCharField(forms.Field):
 
 class AddSecurityForm(forms.Form):
     symbols = CommaSeparatedCharField()
-    # symbols = forms.CharField()
 
+class DataSettingsForm(ModelForm):
+    class Meta:
+        model = DataSettings
+        fields = ['start_date']
+        widgets = {
+            'start_date': DateInput(attrs={'type': 'date'}),
+        }
 
 
