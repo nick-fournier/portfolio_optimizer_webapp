@@ -36,30 +36,31 @@ class AddSecurityView(FormView):
         model_fields = [x for x in model_fields if x not in list(apps.all_models['webface'].keys()) + ['id']]
         renames = {'longbusinesssummary': 'business_summary', 'fulltimeemployees': 'fulltime_employees'}
 
-        for t in symbols:
-            # Download stock meta data and flatten to lowercase
-            meta = yf.Ticker(t).info
-            new_keys = [x.lower().replace(' ', '_') for x in meta.keys()]
-            meta = dict(zip(new_keys, meta.values()))
+        for ticker in symbols:
+            if not SecurityMeta.objects.filter(symbol=ticker).exists():
+                # Download stock meta data and flatten to lowercase
+                meta = yf.Ticker(ticker).info
+                new_keys = [x.lower().replace(' ', '_') for x in meta.keys()]
+                meta = dict(zip(new_keys, meta.values()))
 
-            # Add Null to any missing
-            for field in model_fields:
-                if field not in meta.keys():
-                    meta[field] = None
+                # Add Null to any missing
+                for field in model_fields:
+                    if field not in meta.keys():
+                        meta[field] = None
 
-            # Rename any as needed
-            for key in renames.keys():
-                if key in meta.keys():
-                    meta[renames[key]] = meta.pop(key)
+                # Rename any as needed
+                for key in renames.keys():
+                    if key in meta.keys():
+                        meta[renames[key]] = meta.pop(key)
 
-            # Remove extra
-            meta = {key: meta[key] for key in model_fields}
-            model = SecurityMeta(**meta)
-            model.save()
+                # Remove extra
+                meta = {key: meta[key] for key in model_fields}
+                model = SecurityMeta(**meta)
+                model.save()
 
-            # SecurityMeta.objects.bulk_create(
-            #     SecurityMeta(**vals) for vals in meta#.to_dict('records')
-            # )
+                # SecurityMeta.objects.bulk_create(
+                #     SecurityMeta(**vals) for vals in meta#.to_dict('records')
+                # )
 
     def form_valid(self, form):
         symbols = form.cleaned_data['symbols']  # <--- Add this line to get email value

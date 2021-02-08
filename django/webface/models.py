@@ -7,6 +7,9 @@ from django.db import models
 #     name = models.CharField(max_length=50)
 #     acronym = models.CharField(max_length=50)
 
+class DataSettings(models.Model):
+    start_date = models.DateField()
+
 class SecurityMeta(models.Model):
     # exchange_id = models.ForeignKey(Exchange, on_delete=models.CASCADE)
     currency = models.CharField(default=None, null=True, max_length=3)
