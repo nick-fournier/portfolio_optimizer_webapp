@@ -20,10 +20,7 @@ def date_query(date_list):
 def date_range(date_list):
     min = date_list.min()
     max = date_list.max()
-
     return [d.strftime('%Y-%m-%d') for d in [min, max]]
-
-
 
 class DownloadData:
     def __init__(self, ticker):
@@ -72,7 +69,7 @@ class DownloadData:
         # Extract the target data and determine orientation
         data = getattr(self.stock_data, db_name)
         Database = self.DB_ref[db_name]
-
+        security_id = SecurityMeta.objects.get(symbol=self.ticker).id
 
         if isinstance(data, pd.Series) | isinstance(data.index, pd.DatetimeIndex):
             data = data.reset_index()
@@ -82,11 +79,16 @@ class DownloadData:
 
         # Column names to lowercase
         data.columns = [x.lower().replace(' ', '_') for x in data.columns]
-        dates = [d.strftime('%Y-%m-%d') for d in data['date']]
+        db_dates = Database.objects.filter(security_id=security_id).values_list('date', flat=True)
+
+        # Get dates & find missing
+        new_dates = [d.strftime('%Y-%m-%d') for d in data['date']]
+        db_dates = [d.strftime('%Y-%m-%d') for d in db_dates]
+        new_dates = set(new_dates).difference(db_dates)
 
         #Check if data already downloaded
-        if not Database.objects.filter(date__in=dates).exists():
-            security_id = {'security_id': SecurityMeta.objects.get(symbol=self.ticker).id}
+        if new_dates:
+            security_id = {'security_id': security_id}
             Database.objects.bulk_create(
                 Database(**{**security_id, **vals}) for vals in data.to_dict('records')
             )
