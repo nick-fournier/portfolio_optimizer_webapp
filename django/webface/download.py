@@ -23,68 +23,76 @@ def date_range(date_list):
     return [d.strftime('%Y-%m-%d') for d in [min, max]]
 
 class DownloadData:
+
     def __init__(self, tickers, update=False):
         # Get the data
         start_date = DataSettings.objects.first().start_date
         end_date = date.today().strftime("%Y-%m-%d")
 
+        # Get field names from model, remove related model names
+        self.model_fields = [field.name for field in SecurityMeta._meta.get_fields()]
+        self.model_fields = [x for x in self.model_fields if x not in list(apps.all_models['webface'].keys()) + ['id']]
+        self.renames = {'longbusinesssummary': 'business_summary', 'fulltimeemployees': 'fulltime_employees'}
+        self.update = update
+        self.tickers = tickers
+
+        # k, Run the thang
+        self.check_existing()
+
+    def check_existing(self):
         # Get existing symbols, remove existing from list if update = False
+        the_tickers = self.tickers
         db_symbol_list = list(SecurityMeta.objects.values_list('symbol', flat=True))
-        if not update:
-            tickers = set(tickers).difference(db_symbol_list)
 
-        #Get data for securities, and add prices to data
-        self.stock_data = {t: yf.Ticker(t) for t in tickers}
-        prices = yf.download(tickers, group_by='ticker', start=start_date, end=end_date)
-        for t in tickers:
-            self.stock_data[t].prices = prices[t]
+        if not self.update:
+            the_tickers = set(the_tickers).difference(db_symbol_list)
 
-        self.DB_ref = {'financials': Financials,
-                       'balancesheet': BalanceSheet,
-                       'dividends': Dividends,
-                       'prices': SecurityPrice}
+        # if not empty, run
+        if the_tickers:
+            #Get data for securities, and add prices to data
+            prices = yf.download(the_tickers, group_by='ticker', start=start_date, end=end_date)
+            self.stock_data = {t: yf.Ticker(t) for t in the_tickers}
+            self.DB_ref = {'financials': Financials,
+                           'balancesheet': BalanceSheet,
+                           'dividends': Dividends,
+                           'prices': SecurityPrice}
 
-        for t in tickers:
-            print(t)
-            for key in self.DB_ref.keys():
-                self.set_meta(ticker=t)
-                self.set_data(db_name=key, ticker=t)
+            for t in the_tickers:
+                print('Fetching ' + t)
+                if len(the_tickers) > 1:
+                    self.stock_data[t].prices = prices[t]
+                else:
+                    self.stock_data[t].prices = prices
+
+                for key in self.DB_ref.keys():
+                    self.set_meta(ticker=t)
+                    self.set_data(db_name=key, ticker=t)
 
     def set_meta(self, ticker):
-        # TODO
-        # Get list of db id's to replace and get list of new id's, updated and creating separately
-        # model = SecurityMeta.objects.filter(symbol__in=tickers)
-        if not SecurityMeta.objects.filter(symbol=ticker).exists():
-            meta = self.stock_data[ticker].info
-            # meta = [self.stock_data['meta'][x].info for x in tickers]
+        meta = self.stock_data[ticker].info
+        new_keys = [x.lower().replace(' ', '_') for x in meta.keys()]
+        meta = dict(zip(new_keys, meta.values()))
 
-            # Get field names from model, remove related model names
-            model_fields = [field.name for field in SecurityMeta._meta.get_fields()]
-            model_fields = [x for x in model_fields if x not in list(apps.all_models['webface'].keys()) + ['id']]
-            renames = {'longbusinesssummary': 'business_summary', 'fulltimeemployees': 'fulltime_employees'}
+        # Add Null to any missing
+        for field in self.model_fields:
+            if field not in meta.keys():
+                meta[field] = None
 
-            new_keys = [x.lower().replace(' ', '_') for x in meta.keys()]
-            meta = dict(zip(new_keys, meta.values()))
+        # Rename any as needed
+        for key in self.renames.keys():
+            if key in meta.keys():
+                meta[self.renames[key]] = meta.pop(key)
 
-            # Add Null to any missing
-            for field in model_fields:
-                if field not in meta.keys():
-                    meta[field] = None
-
-            # Rename any as needed
-            for key in renames.keys():
-                if key in meta.keys():
-                    meta[renames[key]] = meta.pop(key)
-
-            # Remove extra fields
-            meta = {key: meta[key] for key in model_fields}
+        # Remove extra fields
+        meta = {key: meta[key] for key in self.model_fields}
+        if SecurityMeta.objects.filter(symbol=ticker).exists():
+            SecurityMeta.objects.filter(symbol=ticker).update(**meta)
+        else:
             model = SecurityMeta(**meta)
             model.save()
 
-    def set_data(self, db_name, ticker):
-        # TODO
-        # Get list of db id's to replace and get list of new id's, updated and creating separately
 
+    def set_data(self, db_name, ticker):
         # Extract the target data and determine orientation
         data = getattr(self.stock_data[ticker], db_name)
         Database = self.DB_ref[db_name]
@@ -102,10 +110,13 @@ class DownloadData:
 
         # Get dates & find missing
         db_dates = Database.objects.filter(security_id=security_id).values_list('date', flat=True)
-        new_dates = [d.strftime('%Y-%m-%d') for d in data['date']]
         db_dates = [d.strftime('%Y-%m-%d') for d in db_dates]
+
+        new_dates = [d.strftime('%Y-%m-%d') for d in data['date']]
         new_dates = set(new_dates).difference(db_dates)
 
+        # TODO
+        # Get list of db id's to replace and get list of new id's, updated and creating separately
         #Check if data already downloaded
         if new_dates:
             security_id = {'security_id': security_id}

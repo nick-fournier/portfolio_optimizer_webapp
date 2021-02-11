@@ -47,6 +47,6 @@ class AddSecurityView(FormView):
 
     def form_valid(self, form):
         tickers = form.cleaned_data['symbols']
-        DownloadData(tickers, update=False)
+        DownloadData(tickers, update=True)
 
         return super().form_valid(form)
