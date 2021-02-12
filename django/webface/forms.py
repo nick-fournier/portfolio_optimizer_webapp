@@ -39,8 +39,11 @@ class CommaSeparatedCharField(forms.Field):
         return value
 
 
-class AddSecurityForm(forms.Form):
+class AddDataForm(forms.Form):
     symbols = CommaSeparatedCharField()
+
+class OptimizeForm(forms.Form):
+    pass
 
 class DataSettingsForm(ModelForm):
     class Meta:

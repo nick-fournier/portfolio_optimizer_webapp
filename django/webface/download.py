@@ -99,11 +99,9 @@ class DownloadData:
         security_id = SecurityMeta.objects.get(symbol=ticker).id
 
         if isinstance(data, pd.Series) | isinstance(data.index, pd.DatetimeIndex):
-            data = data.reset_index()
-            data = data.dropna()
+            data = data.reset_index().dropna()
         elif isinstance(data.columns, pd.DatetimeIndex):
-            data = data.T.reset_index()
-            data.rename(columns={"": "date"}, inplace=True)
+            data = data.T.reset_index().rename(columns={"": "date"})
 
         # Column names to lowercase
         data.columns = [x.lower().replace(' ', '_') for x in data.columns]

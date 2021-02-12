@@ -2,12 +2,13 @@
 
 from django.conf.urls import url, include
 from django.urls import path
-from .views import index, AddSecurityView, DashboardView, DataSettingsView
+from .views import index, AddDataView, DashboardView, DataSettingsView, OptimizeView
 
 urlpatterns = [
     path('', index, name='index'),
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
-    path('dashboard/add-security/', AddSecurityView.as_view(), name='add-security'),
+    path('dashboard/add-data/', AddDataView.as_view(), name='add-data'),
+    path('dashboard/optimize/', OptimizeView.as_view(), name='optimize'),
     path('dashboard/data-settings/<int:pk>', DataSettingsView.as_view(), name='data-settings'),
     path('accounts/', include('django.contrib.auth.urls')),
 ]
