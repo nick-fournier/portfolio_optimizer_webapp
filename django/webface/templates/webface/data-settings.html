@@ -2,12 +2,14 @@
 
 {% block content %}
 
-<h4>Update data settings</h4>
-<p>Select oldest possible date to be downloaded</p>
-<form action="" method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <input type="submit" value="Create">
-</form>
+<div class="container">
+    <h4>Update data settings</h4>
+    <p>Select oldest possible date to be downloaded</p>
+    <form action="" method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <input type="submit" value="Create">
+    </form>
+</div>
 
 {% endblock %}

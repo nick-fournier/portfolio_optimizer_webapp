@@ -1,7 +1,8 @@
 from .models import Financials, BalanceSheet, Scores
+from django.db.models import Q
 
 import pandas as pd
-import math
+import numpy as np
 from datetime import date
 
 class GetFscore:
@@ -10,6 +11,7 @@ class GetFscore:
         self.year = date.today().year
         self.data = self.get_data()
         self.scores = self.calc_scores()
+        self.save_scores()
 
     def calc_delta(self, series):
         return (series - series.shift(-1)) / series.shift(-1)
@@ -23,17 +25,16 @@ class GetFscore:
         neg_cols = ['delta_long_lev_ratio']
         leq_cols = ['delta_shares']
 
-        print(type(row))
         oriented = pd.concat([row[pos_cols], -1 * row[neg_cols]])
         oriented = oriented.dropna()
 
-        print(oriented)
+        # 1 if > 0 and 1 if >= 0
         score = sum([1 for x in oriented if x > 0])
-        if not math.isnan(row[leq_cols].item()):
-            if row[leq_cols].item() >= 0:
-                score += 1
-
-        print(score)
+        if row[leq_cols].item() <= 0:
+            score += 1
+        # if not math.isnan(row[leq_cols].item()):
+        #     if row[leq_cols].item() <= 0:
+        #         score += 1
 
         return score
 
@@ -54,7 +55,11 @@ class GetFscore:
             'security_id', 'date', 'total_current_assets', 'total_assets',
             'total_current_liabilities', 'total_liab', 'cash', 'common_stock'
         )))
-        return balancesheet.merge(financials, on=['date', 'security_id'])
+        data = balancesheet.merge(financials, on=['date', 'security_id'])
+        flt_cols = list(set(data.columns).difference(['security_id', 'date']))
+        data[flt_cols] = data[flt_cols].astype(float)
+
+        return data
 
     def calc_measures(self):
         df_measures = pd.DataFrame()
@@ -78,8 +83,9 @@ class GetFscore:
             )
             df_measures = df_measures.append(measures)
 
-        # round off excess
-        # df_measures = df_measures.round(6)
+        # Fill Nones
+        df_measures = df_measures.fillna(np.nan)
+
         return df_measures
 
     def calc_scores(self):
@@ -89,11 +95,28 @@ class GetFscore:
         return measures
 
     def save_scores(self):
-        Scores.objects.bulk_create(
-            Scores(**vals) for vals in self.scores.to_dict('records')
-        )
-        # security_id = {'security_id': security_id}
-        # Database.objects.bulk_create(
-        #     Database(**{**security_id, **vals}) for vals in data.to_dict('records')
-        # )
 
+        rnd_cols = list(set(self.scores.columns).difference(['security_id', 'date', 'PF_score', 'cash']))
+
+        scores_formatted = self.scores
+        scores_formatted[rnd_cols] = scores_formatted[rnd_cols].astype(float).round(6)
+        scores_formatted['cash'] = scores_formatted['cash']/1e6
+        scores_formatted['PF_score'] = scores_formatted['PF_score'].astype(int)
+        scores_formatted = scores_formatted.replace({np.NaN: None})
+
+        old_scores = pd.DataFrame(columns=['security_id', 'date'])
+        old_scores = old_scores.append(
+            pd.DataFrame(
+                Scores.objects.filter(
+                    Q(security_id__in=scores_formatted['security_id']) & Q(date__in=scores_formatted['date'])
+                ).values('security_id', 'date')
+            )
+        )
+
+        new_scores = scores_formatted[~(scores_formatted.date.isin(old_scores.date) &
+                                        scores_formatted.security_id.isin(old_scores.security_id))]
+        print(scores_formatted['security_id'].unique())
+        if not new_scores.empty:
+            Scores.objects.bulk_create(
+                Scores(**vals) for vals in new_scores.to_dict('records')
+            )

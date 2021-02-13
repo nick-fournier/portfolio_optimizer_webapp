@@ -2,16 +2,17 @@
 
 {% block content %}
 
+<div class="container">
 <h4>Update Piotroski F-scores</h4>
-
-<form action="" method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <div id="progress-wrapper">
-        <input type="submit" value="Optimize", id="progress-bar-trigger">
-        <div id="progress-bar" style="background-color: blue; width: 0%;">&nbsp;</div>
-        <div id="progress-bar-message">Waiting for progress to start...</div>
-    </div>
-</form>
+    <form action="" method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <div id="progress-wrapper">
+            <input type="submit" value="Optimize", id="progress-bar-trigger">
+            <div id="progress-bar" style="background-color: blue; width: 0%;">&nbsp;</div>
+            <div id="progress-bar-message">Waiting for progress to start...</div>
+        </div>
+    </form>
+</div>
 
 {% endblock %}

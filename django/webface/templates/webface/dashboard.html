@@ -1,20 +1,41 @@
 {% extends 'base.html' %}
 {% block content %}
 
-<h4 class="w3-center">Data</h4>
-{% if security_list %}
-    <table>
+<div class="container">
+    <h2 class="text-center">Piotroski F-Scores</h2><br>
+    <table class="table table-dark table-striped">
+        <thead>
         <tr>
+            <th>Symbol</th>
             <th>Name</th>
+            <th>Country</th>
+            <th>Currency</th>
+            <th>Industry</th>
+            <th>Sector</th>
+            <th>F-score</th>
+            <th>Weighted F-score</th>
+            <th>Calculation date</th>
         </tr>
-        {% for security in security_list%}
+        </thead>
+        <tbody>
+        <!-- jinja2 Technique -->
+        {% if score_table %}
+        {% for i in score_table %}
         <tr>
-            <td>{{security.symbol}}</td>
+            <td>{{i.symbol}}</td>
+            <td>{{i.longname}}</td>
+            <td>{{i.country}}</td>
+            <td>{{i.currency}}</td>
+            <td>{{i.industry}}</td>
+            <td>{{i.sector}}</td>
+            <td>{{i.PF_score}}</td>
+            <td>{{i.PF_score_weighted}}</td>
+            <td>{{i.date}}</td>
         </tr>
         {% endfor %}
+        {% endif %}
+        </tbody>
     </table>
-{% else %}
-    <p class="w3-center">There is nothing here yet...</p>
-{% endif %}
+</div>
 
 {% endblock %}
