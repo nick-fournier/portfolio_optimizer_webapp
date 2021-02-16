@@ -39,7 +39,7 @@ class GetFscore:
         return score
 
     def PF_score_weighted(self, row):
-        cols = ['ROA', 'cash_ratio', 'delta_ROA', 'accruals',
+        cols = ['ROA', 'delta_cash', 'delta_ROA', 'accruals',
                 'delta_current_lev_ratio', 'delta_gross_margin', 'delta_asset_turnover']
         inv_cols = ['delta_long_lev_ratio', 'delta_shares']
 
@@ -69,7 +69,8 @@ class GetFscore:
             measures = pd.DataFrame(df[['security_id', 'date']])
             measures['ROA'] = df['net_income'] / df['total_current_assets']
             measures['cash'] = df['cash']
-            measures['cash_ratio'] = df['cash'] / df['total_current_liabilities']
+            # measures['cash_ratio'] = df['cash'] / df['total_current_liabilities']
+            measures['delta_cash'] = self.calc_delta(df['cash'])
             measures['delta_ROA'] = self.calc_delta(df['net_income'] / df['total_current_assets'])
             measures['accruals'] = df['cash'] / df['total_current_assets']
             measures['delta_long_lev_ratio'] = self.calc_delta(df['total_liab'] / df['total_assets'])
@@ -115,7 +116,6 @@ class GetFscore:
 
         new_scores = scores_formatted[~(scores_formatted.date.isin(old_scores.date) &
                                         scores_formatted.security_id.isin(old_scores.security_id))]
-        print(scores_formatted['security_id'].unique())
         if not new_scores.empty:
             Scores.objects.bulk_create(
                 Scores(**vals) for vals in new_scores.to_dict('records')

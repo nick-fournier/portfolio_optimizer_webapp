@@ -5,6 +5,7 @@ from django.forms import ModelForm
 from django.forms.widgets import DateInput
 from .models import SecurityMeta, DataSettings
 import yfinance as yf
+import datetime
 
 
 class MinLengthValidator(validators.MinLengthValidator):
@@ -38,19 +39,35 @@ class CommaSeparatedCharField(forms.Field):
         self.run_validators(value)
         return value
 
+# class AddDataForm(forms.Form):
+#     symbol = CommaSeparatedCharField()
+#
+# class OptimizeForm(forms.Form):
+#     pass
 
-class AddDataForm(forms.Form):
+# class DataSettingsForm(ModelForm):
+#     class Meta:
+#         model = DataSettings
+#         fields = ['start_date']
+#         widgets = {
+#             'start_date': DateInput(attrs={'type': 'date'}),
+#         }
+
+class MultipleForm(forms.Form):
+    action = forms.CharField(max_length=60, widget=forms.HiddenInput())
+
+class AddDataForm(MultipleForm):
     symbols = CommaSeparatedCharField()
 
-class OptimizeForm(forms.Form):
+class OptimizeForm(MultipleForm):
     pass
 
 class DataSettingsForm(ModelForm):
+    # start_date = forms.DateField(initial=datetime.datetime(2010, 1, 1))
+    start_date = DataSettings.objects.first()
     class Meta:
         model = DataSettings
         fields = ['start_date']
         widgets = {
             'start_date': DateInput(attrs={'type': 'date'}),
         }
-
-

@@ -10,8 +10,12 @@ from django.db import models
 class DataSettings(models.Model):
     start_date = models.DateField()
 
+class SecurityList(models.Model):
+    symbol = models.CharField(default=None, null=True, max_length=12)
+
 class SecurityMeta(models.Model):
     # exchange_id = models.ForeignKey(Exchange, on_delete=models.CASCADE)
+    security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
     currency = models.CharField(default=None, null=True, max_length=3)
     symbol = models.CharField(default=None, null=True, max_length=12)
     longname = models.CharField(default=None, null=True, max_length=100)
@@ -23,8 +27,8 @@ class SecurityMeta(models.Model):
     business_summary = models.CharField(default=None, null=True, max_length=3000)       # longBusinessSummary
 
 class SecurityPrice(models.Model):
-    security = models.ForeignKey(SecurityMeta, on_delete=models.CASCADE)
-    date = models.DateField()
+    security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
+    date = models.DateField(null=True)
     open = models.DecimalField(max_digits=10, decimal_places=6)
     high = models.DecimalField(max_digits=10, decimal_places=6)
     low = models.DecimalField(max_digits=10, decimal_places=6)
@@ -33,8 +37,8 @@ class SecurityPrice(models.Model):
     volume = models.IntegerField(default=None, null=True)
 
 class Financials(models.Model):
-    security = models.ForeignKey(SecurityMeta, on_delete=models.CASCADE)
-    date = models.DateField()
+    security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
+    date = models.DateField(null=True)
     research_development = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     effect_of_accounting_charges = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     income_before_tax = models.DecimalField(max_digits=17, null=True, decimal_places=2)
@@ -59,8 +63,8 @@ class Financials(models.Model):
     net_income_applicable_to_common_shares = models.DecimalField(max_digits=17, null=True, decimal_places=2)
 
 class BalanceSheet(models.Model):
-    security = models.ForeignKey(SecurityMeta, on_delete=models.CASCADE)
-    date = models.DateField()
+    security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
+    date = models.DateField(null=True)
     intangible_assets = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     total_liab = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     total_stockholder_equity = models.DecimalField(max_digits=17, null=True, decimal_places=2)
@@ -92,20 +96,19 @@ class BalanceSheet(models.Model):
     minority_interest = models.DecimalField(max_digits=17, null=True, decimal_places=2)
 
 class Dividends(models.Model):
-    security = models.ForeignKey(SecurityMeta, on_delete=models.CASCADE)
-    date = models.DateField()
-    dividends = models.DecimalField(max_digits=16, decimal_places=6)
+    security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
+    date = models.DateField(null=True)
+    dividends = models.DecimalField(null=True, max_digits=16, decimal_places=6)
 
 class Scores(models.Model):
-    security = models.ForeignKey(SecurityMeta, on_delete=models.CASCADE)
-    date = models.DateField()
+    security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
+    date = models.DateField(null=True)
     variance = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     PF_score = models.IntegerField(default=None, null=True)
     PF_score_weighted = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     ROA = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    # cash = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     cash = models.IntegerField(default=None, null=True)
-    cash_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    delta_cash = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     delta_ROA = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     accruals = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     delta_long_lev_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)

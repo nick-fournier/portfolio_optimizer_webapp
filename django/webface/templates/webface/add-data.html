@@ -4,16 +4,36 @@
 
 {% block content %}
 <div class="container">
-<h4>Import list of tickers to the portfolio</h4>
-<p>Add a comma separated list of stock symbols</p>
+    <h4>Import list of tickers to be downloaded</h4>
+    <p>System will download them in next cycle. <br>
+        Add a comma separated list of stock symbols
+    </p>
     <form method="post">
         {% csrf_token %}
         {{ form.as_p }}
-        <div id="progress-wrapper">
-            <input type="submit" value="Save", id="progress-bar-trigger">
-            <div id="progress-bar" style="background-color: blue; width: 0%;">&nbsp;</div>
-            <div id="progress-bar-message">Waiting for progress to start...</div>
-        </div>
+        <input type="submit" value="Save">
     </form>
+
+    <table class="table table-sm" style="margin-top:20px">
+        <thead class="thead-dark">
+        <tr>
+            <th>Current symbols being monitored</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% if ticker_list %}
+        {% for i in ticker_list %}
+        <tr>
+            <td>{{i.symbol}}</td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr>
+            <td>No tickers in database...</td>
+        </tr>
+        {% endif %}
+        </tbody>
+    </table>
+
 </div>
 {% endblock %}

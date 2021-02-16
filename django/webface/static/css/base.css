@@ -1,3 +1,11 @@
+.table{
+  font-size: 12px;
+}
+
+h4 {
+    margin-top: 20px
+}
+
 #progress-bar {
     margin-top: 1em;
 }
