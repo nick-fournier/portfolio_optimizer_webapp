@@ -129,6 +129,8 @@ class Scores(models.Model):
     variance = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     PF_score = models.IntegerField(default=None, null=True)
     PF_score_weighted = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    EPS = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    PE_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     ROA = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     cash = models.IntegerField(default=None, null=True)
     delta_cash = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
@@ -139,3 +141,4 @@ class Scores(models.Model):
     delta_shares = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     delta_gross_margin = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     delta_asset_turnover = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+
