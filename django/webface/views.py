@@ -1,17 +1,14 @@
 # webface/views.py
 
 from django.urls import reverse, reverse_lazy
-from django.apps import apps
 from django.shortcuts import render
-from django.views.generic.edit import CreateView, FormView, UpdateView
-from django.views.generic import TemplateView
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponseRedirect
 
-from django.db.models import Max, Subquery, OuterRef
+from django.db.models import Subquery, OuterRef
 from background_task import background
 
-from .piotroski_fscore import GetFscore
-from .download import DownloadCompanyData
+from optimizer.piotroski_fscore import GetFscore
+from optimizer.download import DownloadCompanyData
 from .models import DataSettings, SecurityMeta, Scores, SecurityList
 from .forms import OptimizeForm, AddDataForm, DataSettingsForm
 from .multiforms import MultiFormsView
