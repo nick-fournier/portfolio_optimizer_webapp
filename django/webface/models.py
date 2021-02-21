@@ -61,6 +61,8 @@ class Financials(models.Model):
     discontinued_operations = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     net_income_from_continuing_ops = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     net_income_applicable_to_common_shares = models.DecimalField(max_digits=17, null=True, decimal_places=2)
+    quarterly_price = models.DecimalField(max_digits=17, null=True, decimal_places=2)
+    quarterly_variance = models.DecimalField(max_digits=17, null=True, decimal_places=2)
 
 class BalanceSheet(models.Model):
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
@@ -94,6 +96,27 @@ class BalanceSheet(models.Model):
     accounts_payable = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     capital_surplus = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     minority_interest = models.DecimalField(max_digits=17, null=True, decimal_places=2)
+
+# class Cashflow(models.Model):
+#     investments
+#     change_to_liabilities
+#     total_cashflows_from_investing_activities
+#     net_borrowings
+#     total_cash_from_financing_activities
+#     change_to_operating_activities
+#     net_income
+#     change_in_cash
+#     effect_of_exchange_rate
+#     total_cash_from_operating_activities
+#     depreciation
+#     other_cashflows_from_investing_activities
+#     change_to_inventory
+#     change_to_account_receivables
+#     other_cashflows_from_financing_activities
+#     change_to_netincome
+#     capital_expenditures
+#     dividends_paid
+
 
 class Dividends(models.Model):
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
