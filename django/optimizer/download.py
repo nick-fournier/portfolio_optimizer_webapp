@@ -106,13 +106,13 @@ class DownloadCompanyData:
             self.the_tickers = get_missing(self.id_table, self.all_tickers)
 
         # get data
-        # if self.the_tickers:
-        #     self.get_data()
-        # if self.the_tickers:
-        #     self.set_meta()
-        #     self.set_data()
-        # else:
-        #     print('No new tickers to update.')
+        if self.the_tickers:
+            self.get_data()
+        if self.the_tickers:
+            self.set_meta()
+            self.set_data()
+        else:
+            print('No new tickers to update.')
 
     def get_data(self):
         print('Downloading stock data for:')
@@ -202,7 +202,7 @@ class DownloadCompanyData:
     def set_data(self):
         for db_name in self.DB_ref.keys():
             Database = self.DB_ref[db_name]
-            data = self.data['db_name']
+            data = self.data[db_name]
             data.columns = [x.lower().replace(' ', '_') for x in data.columns]
             data = data.replace({pd.NaT: None})
 
