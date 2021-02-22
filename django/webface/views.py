@@ -31,7 +31,6 @@ def chunked_iterable(iterable, size):
 @background(schedule=0)
 def fetch_financials():
     tickers = SecurityList.objects.all().values_list('symbol', flat=True)
-    # DownloadData(tickers, get_prices=False, updates=False)
     for c in chunked_iterable(tickers, 100):
         DownloadCompanyData(c, updates=False)
 

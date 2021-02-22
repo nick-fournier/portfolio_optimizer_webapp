@@ -67,7 +67,7 @@ class GetFscore:
 
     def get_data(self):
         financials = pd.DataFrame(list(Financials.objects.all().values(
-            'security_id', 'date', 'gross_profit', 'total_revenue', 'net_income'
+            'security_id', 'date', 'gross_profit', 'total_revenue', 'net_income', 'quarterly_close'
         )))
         balancesheet = pd.DataFrame(list(BalanceSheet.objects.all().values(
             'security_id', 'date', 'total_current_assets', 'total_assets',

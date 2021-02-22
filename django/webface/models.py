@@ -61,7 +61,7 @@ class Financials(models.Model):
     discontinued_operations = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     net_income_from_continuing_ops = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     net_income_applicable_to_common_shares = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-    quarterly_price = models.DecimalField(max_digits=17, null=True, decimal_places=2)
+    quarterly_close = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     quarterly_variance = models.DecimalField(max_digits=17, null=True, decimal_places=2)
 
 class BalanceSheet(models.Model):
