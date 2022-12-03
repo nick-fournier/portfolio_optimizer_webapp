@@ -7,6 +7,8 @@ from django.db import models
 #     name = models.CharField(max_length=50)
 #     acronym = models.CharField(max_length=50)
 
+#TODO Clean up the data fields to be more efficent (e.g., divide by million, as int, etc.
+
 class DataSettings(models.Model):
     start_date = models.DateField()
 
@@ -98,6 +100,7 @@ class BalanceSheet(models.Model):
     accounts_payable = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     capital_surplus = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     minority_interest = models.DecimalField(max_digits=17, null=True, decimal_places=2)
+    gains_losses_not_affecting_retained_earnings = models.DecimalField(max_digits=17, null=True, decimal_places=2)
 
 # class Cashflow(models.Model):
 #     investments

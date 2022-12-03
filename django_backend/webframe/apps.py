@@ -2,4 +2,4 @@ from django.apps import AppConfig
 
 
 class WebfaceConfig(AppConfig):
-    name = 'optimizer'
+    name = 'webframe'

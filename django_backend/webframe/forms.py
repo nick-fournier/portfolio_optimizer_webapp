@@ -2,7 +2,8 @@ from django import forms
 from django.core import validators
 from django.forms import ModelForm
 from django.forms.widgets import DateInput
-from .models import DataSettings
+
+from webframe import models
 
 from django.db.utils import OperationalError
 import datetime
@@ -50,13 +51,13 @@ class AddDataForm(forms.Form):
 
 class DataSettingsForm(ModelForm):
     try:
-        start_date = DataSettings.objects.first()
+        start_date = models.DataSettings.objects.first()
     except OperationalError:
         default_start_date = datetime.date.today() - datetime.timedelta(days=365)
         start_date = forms.DateField(initial=default_start_date)
 
     class Meta:
-        model = DataSettings
+        model = models.DataSettings
         fields = ['start_date']
         widgets = {
             'start_date': DateInput(attrs={'type': 'date'}),

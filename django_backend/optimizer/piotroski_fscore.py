@@ -1,4 +1,4 @@
-from optimizer.models import Financials, BalanceSheet, Scores
+from webframe.models import Financials, BalanceSheet, Scores
 from django.db.models import Q
 
 import pandas as pd
@@ -66,21 +66,16 @@ class GetFscore:
             self.save_scores()
 
     def get_data(self):
-        financials = pd.DataFrame(list(Financials.objects.all().values(
-            'security_id', 'date', 'gross_profit', 'total_revenue', 'net_income', 'quarterly_close'
-        )))
-        balancesheet = pd.DataFrame(list(BalanceSheet.objects.all().values(
-            'security_id', 'date', 'total_current_assets', 'total_assets',
-            'total_current_liabilities', 'total_liab', 'cash', 'common_stock'
-        )))
+        financials = pd.DataFrame(Financials.objects.all().values()).drop(columns='id')
+        balancesheet = pd.DataFrame(BalanceSheet.objects.all().values()).drop(columns='id')
         data = balancesheet.merge(financials, on=['date', 'security_id'])
-        flt_cols = list(set(data.columns).difference(['security_id', 'date']))
-        data[flt_cols] = data[flt_cols].astype(float)
+        float_cols = list(set(data.columns).difference(['security_id', 'date']))
+        data[float_cols] = data[float_cols].astype(float)
 
         return data
 
     def calc_scores(self):
-        df_measures = pd.DataFrame()
+        df_measures = []
         for x in self.data.security_id.unique():
             df = self.data.loc[self.data.security_id == x]
 
@@ -103,7 +98,10 @@ class GetFscore:
             )
             measures['EPS'] = df['net_income'] / df['common_stock']
             measures['PE_ratio'] = df['quarterly_close'] / (df['net_income'] / df['common_stock'])
-            df_measures = df_measures.append(measures)
+
+            df_measures.append(measures)
+
+        df_measures = pd.concat(df_measures, axis=0)
 
         # Fill Nones
         df_measures = df_measures.fillna(np.nan)
@@ -120,14 +118,14 @@ class GetFscore:
         scores_formatted['PF_score'] = scores_formatted['PF_score'].astype(int)
         scores_formatted = scores_formatted.replace([np.NaN, np.inf, -np.inf], None)
 
-        old_scores = pd.DataFrame(columns=['security_id', 'date'])
-        old_scores = old_scores.append(
-            pd.DataFrame(
-                Scores.objects.filter(
-                    Q(security_id__in=scores_formatted['security_id']) & Q(date__in=scores_formatted['date'])
-                ).values('security_id', 'date')
-            )
+        df_template = pd.DataFrame(columns=['security_id', 'date'])
+        old_scores = pd.DataFrame(
+            Scores.objects.filter(
+                Q(security_id__in=scores_formatted['security_id']) & Q(date__in=scores_formatted['date'])
+            ).values('security_id', 'date')
         )
+
+        old_scores = pd.concat([df_template, old_scores], axis=0)
 
         new_scores = scores_formatted[~(scores_formatted.date.isin(old_scores.date) &
                                         scores_formatted.security_id.isin(old_scores.security_id))]
