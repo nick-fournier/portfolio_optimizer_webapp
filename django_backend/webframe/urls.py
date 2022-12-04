@@ -8,7 +8,7 @@ from django.urls import path, include
 from rest_framework import routers
 
 router = routers.DefaultRouter()
-router.register(r'data-settings', DataSettingsSerializerView, 'data-settings')
+router.register(r'data-settings/1', DataSettingsSerializerView, 'data-settings')
 
 urlpatterns = [
     path('', index, name='index'),

@@ -22,43 +22,48 @@ from datetime import date
 # EPS = (Net Income - Preferred Dividends) / Common Stock
 # P/E = Price / EPS
 
-def calc_delta(series):
-    return (series - series.shift(-1)) / series.shift(-1)
+def calc_delta(series, as_percent = False):
+    delta = series - series.shift(-1)
+    if as_percent:
+        delta /= series.shift(-1)
 
-def calc_ratio(numer, denom):
-    return numer / denom
+    return delta
 
-def PF_score(row):
-    pos_cols = ['ROA', 'cash', 'delta_ROA', 'accruals',
-                'delta_current_lev_ratio', 'delta_gross_margin', 'delta_asset_turnover']
-    neg_cols = ['delta_long_lev_ratio']
-    leq_cols = ['delta_shares']
-
-    oriented = pd.concat([row[pos_cols], -1 * row[neg_cols]])
-    oriented = oriented.dropna()
-
-    # 1 if > 0 and 1 if >= 0
-    score = sum([1 for x in oriented if x > 0])
-    if row[leq_cols].item() <= 0:
-        score += 1
-
-    return score
-
-def PF_score_weighted(row):
+def calc_pf_score(df, weighted=False):
+    # 1 point if positive
     pos_cols = ['ROA', 'delta_cash', 'delta_ROA', 'accruals',
                 'delta_current_lev_ratio', 'delta_gross_margin', 'delta_asset_turnover']
+
+    # 1 point if negative
     neg_cols = ['delta_long_lev_ratio']
+
+    # 1 point if less than or equal to 0
     leq_cols = ['delta_shares']
 
-    oriented = pd.concat([row[pos_cols], -1 * row[neg_cols]])
-    oriented = oriented.dropna()
-    score_weighted = sum([(1 + x) for x in list(oriented + row[leq_cols].item()) if x > 0])
+    # Sum up the score
+    scores = pd.concat([df[pos_cols] > 0, df[neg_cols] < 0, df[leq_cols] <= 0], axis=1).astype(int)
 
-    return score_weighted
+    if weighted:
+        weights = df[pos_cols + neg_cols + leq_cols].abs() + 1
+        scores = scores * weights
+
+    # Set first date as NA because there is no previous to calc delta on
+    scores = scores.sum(axis=1)
+    old_date = df.date
+    df.date = pd.to_datetime(df.date)
+    scores.iloc[df.groupby('security_id').date.idxmin()] = 0
+    df.date = old_date
+
+    return scores
 
 class GetFscore:
 
-    def __init__(self):
+    def __init__(self, recalc_db=False):
+
+        if recalc_db:
+            # TODO filter on select security IDs to perform partial update
+            pass
+
         if Financials.objects.exists() and BalanceSheet.objects.exists():
             self.year = date.today().year
             self.data = self.get_data()
@@ -76,61 +81,118 @@ class GetFscore:
 
     def calc_scores(self):
         df_measures = []
-        for x in self.data.security_id.unique():
-            df = self.data.loc[self.data.security_id == x]
 
-            # Calc the criteria metrics
+        for id, df in self.data.groupby('security_id'):
+            df = df.sort_values('date', ascending=False)
+
+            # Initialize clean dataframe to build on
             measures = pd.DataFrame(df[['security_id', 'date']])
+
+            ### Profitability ###
+            # ROA = Net Income / Total Assets | 1 if positive
             measures['ROA'] = df['net_income'] / df['total_current_assets']
-            measures['cash'] = df['cash']
-            # measures['cash_ratio'] = df['cash'] / df['total_current_liabilities']
-            measures['delta_cash'] = calc_delta(df['cash'])
+            # Cash Flow | 1 if positive
+            measures['delta_cash'] = calc_delta(df['cash'], as_percent=True)
+            # Change in ROA | 1 if positive (greater than last year)
             measures['delta_ROA'] = calc_delta(df['net_income'] / df['total_current_assets'])
+            # Accruals | Score 1 if CFROA > ROA
             measures['accruals'] = df['cash'] / df['total_current_assets']
+
+            ### Leverage, Liquidity and Source of Funds ###
+            # Long term leverage ratio | 1 if negative (lower than last year)
             measures['delta_long_lev_ratio'] = calc_delta(df['total_liab'] / df['total_assets'])
+            # Current leverage ratio | 1 point if positive (higher than last year)
             measures['delta_current_lev_ratio'] = calc_delta(
                 df['total_current_liabilities'] / df['total_current_assets']
             )
-            measures['delta_shares'] = calc_delta(df['common_stock'])
-            measures['delta_gross_margin'] = calc_delta(df['gross_profit'] / df['total_revenue'])
-            measures['delta_asset_turnover'] = calc_delta(
-                (df['total_revenue'] / (df['total_assets'] + df['total_assets'].shift(-1))/2)
-            )
-            measures['EPS'] = df['net_income'] / df['common_stock']
-            measures['PE_ratio'] = df['quarterly_close'] / (df['net_income'] / df['common_stock'])
+            # Change in shares | 1 if no no shares (<=0)
+            measures['delta_shares'] = calc_delta(df['shares_outstanding'], as_percent=True)
 
+            ### Operating Efficiency ###
+            # Gross margin | 1 if positive (higher than last year)
+            measures['delta_gross_margin'] = calc_delta(df['gross_profit'] / df['total_revenue'])
+            # Asset turnover | 1 if positive (higher than last year)
+            measures['delta_asset_turnover'] = calc_delta(
+                (df['total_revenue'] / (df['total_assets'] + df['total_assets'].shift(-1)) / 2)
+            )
+
+            ### Other metrics ###
+            measures['cash'] = df['cash']
+            measures['cash_ratio'] = df['cash'] / df['total_current_liabilities']
+            measures['EPS'] = df['net_income_applicable_to_common_shares'] / df['shares_outstanding']
+            measures['PE_ratio'] = df['quarterly_close'] / measures['EPS']
+
+            # add to list
             df_measures.append(measures)
 
-        df_measures = pd.concat(df_measures, axis=0)
+        # Concat into df
+        df_measures = pd.concat(df_measures, axis=0).fillna(np.nan)
 
-        # Fill Nones
-        df_measures = df_measures.fillna(np.nan)
-        df_measures['PF_score'] = df_measures.apply(PF_score, axis=1)
-        df_measures['PF_score_weighted'] = df_measures.apply(PF_score_weighted, axis=1)
+        calc_pf_score(df_measures, weighted=True)
+
+        # Calculate PF Score
+        df_measures['PF_score'] = calc_pf_score(df_measures, weighted=False)
+        df_measures['PF_score_weighted'] = calc_pf_score(df_measures, weighted=True)
 
         return df_measures
 
     def save_scores(self):
         rnd_cols = list(set(self.scores.columns).difference(['security_id', 'date', 'PF_score', 'cash']))
-        scores_formatted = self.scores
-        scores_formatted[rnd_cols] = scores_formatted[rnd_cols].astype(float).round(6)
-        scores_formatted['cash'] = scores_formatted['cash']#/1e6
-        scores_formatted['PF_score'] = scores_formatted['PF_score'].astype(int)
-        scores_formatted = scores_formatted.replace([np.NaN, np.inf, -np.inf], None)
+        new_scores = self.scores
+        new_scores[rnd_cols] = new_scores[rnd_cols].astype(float).round(6)
+        new_scores['cash'] = new_scores['cash']
+        new_scores['PF_score'] = new_scores['PF_score'].astype(int)
+        new_scores = new_scores.replace([np.NaN, np.inf, -np.inf], None)
 
-        df_template = pd.DataFrame(columns=['security_id', 'date'])
-        old_scores = pd.DataFrame(
-            Scores.objects.filter(
-                Q(security_id__in=scores_formatted['security_id']) & Q(date__in=scores_formatted['date'])
-            ).values('security_id', 'date')
+        # Check for existing scores in DB
+        old_scores = Scores.objects.filter(
+                Q(security_id__in=new_scores['security_id']) &
+                Q(date__in=new_scores['date'])
+            ).values('id', 'security_id', 'date')
+
+        if old_scores.exists():
+            old_scores = pd.DataFrame(old_scores).merge(
+                new_scores, on=['security_id', 'date']
+            )
+
+            new_scores = new_scores[
+                ~(new_scores.date.isin(old_scores.date) &
+                  new_scores.security_id.isin(old_scores.security_id))
+                ]
+
+            old_scores = old_scores.to_dict('records')
+
+            # Grab the actual queryset to preserve pk
+            old_scores_update = []
+            for score in old_scores:
+                score_set = Scores.objects.get(id=score['id'])
+                for k, v in score.items():
+                    setattr(score_set, k, v)
+                old_scores_update.append(score_set)
+
+            Scores.objects.bulk_update(
+                old_scores_update,
+                #old_scores.to_dict('records'),
+                fields=list(new_scores.columns)
+            )
+
+        Scores.objects.bulk_create(
+            Scores(**vals) for vals in new_scores.to_dict('records')
         )
 
-        old_scores = pd.concat([df_template, old_scores], axis=0)
-
-        new_scores = scores_formatted[~(scores_formatted.date.isin(old_scores.date) &
-                                        scores_formatted.security_id.isin(old_scores.security_id))]
-
-        if not new_scores.empty:
-            Scores.objects.bulk_create(
-                Scores(**vals) for vals in new_scores.to_dict('records')
-            )
+        # df_template = pd.DataFrame(columns=['security_id', 'date'])
+        # old_scores = pd.DataFrame(
+        #     Scores.objects.filter(
+        #         Q(security_id__in=scores_formatted['security_id']) & Q(date__in=scores_formatted['date'])
+        #     ).values('security_id', 'date')
+        # )
+        #
+        # old_scores = pd.concat([df_template, old_scores], axis=0)
+        #
+        # new_scores = scores_formatted[~(scores_formatted.date.isin(old_scores.date) &
+        #                                 scores_formatted.security_id.isin(old_scores.security_id))]
+        #
+        # if not new_scores.empty:
+        #     Scores.objects.bulk_create(
+        #         Scores(**vals) for vals in new_scores.to_dict('records')
+        #     )

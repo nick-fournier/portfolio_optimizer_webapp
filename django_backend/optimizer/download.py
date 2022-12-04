@@ -1,7 +1,7 @@
 
 from django.apps import apps
 from webframe import models
-import piotroski_fscore
+from optimizer import piotroski_fscore
 from django.db.models import Q
 
 from optimizer import utils
@@ -36,7 +36,7 @@ class DownloadCompanyData:
             self.get_data()
             self.set_meta()
             self.set_data()
-            piotroski_fscore.GetFscore
+            piotroski_fscore.GetFscore()
 
 
         else:
@@ -58,9 +58,17 @@ class DownloadCompanyData:
 
                 df_dict = {}
                 df_dict['meta'] = pd.DataFrame([obj.info])
-                df_dict['financials'] = obj.quarterly_financials.T.reset_index().rename(columns={"": "date"})
-                df_dict['balancesheet'] = obj.quarterly_balancesheet.T.reset_index().rename(columns={"": "date"})
+                df_dict['financials'] = obj.financials.T.reset_index().rename(columns={"": "date"})
+                df_dict['balancesheet'] = obj.balancesheet.T.reset_index().rename(columns={"": "date"})
+                # df_dict['financials'] = obj.quarterly_financials.T.reset_index().rename(columns={"": "date"})
+                # df_dict['balancesheet'] = obj.quarterly_balancesheet.T.reset_index().rename(columns={"": "date"})
                 df_dict['dividends'] = obj.dividends.reset_index().dropna()
+
+                # Add shares outstanding to balance sheet
+                df_dict['balancesheet'].index = df_dict['balancesheet'].date.dt.year
+                df_dict['balancesheet'] = df_dict['balancesheet'].join(obj.shares).rename(
+                    columns={'BasicShares': 'shares_outstanding'}
+                )
 
                 for df_name, df in df_dict.items():
                     # Add security id

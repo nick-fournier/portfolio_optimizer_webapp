@@ -29,10 +29,11 @@ def get_missing(proposed_tickers):
     existing = models.SecurityList.objects.filter(symbol__in=proposed_tickers)
     missing = set(proposed_tickers).difference(existing.values_list('symbol', flat=True))
 
-    # Then find any out of date ones that are in the database
+    # Then find any that are out of date
     start_date = models.DataSettings.objects.values_list('start_date').first()[0]
-    existing_todate = models.Financials.objects.filter(date__range=[start_date, datetime.date.today()])
-    existing_todate = existing_todate.values_list('security_id', flat=True)
+    existing_todate = models.Financials.objects.filter(Q(security_id__in=existing) &
+                                                       Q(date=start_date))
+
     # Get the corresponding symbol
     existing_todate = models.SecurityList.objects.filter(id__in=existing_todate).values_list('symbol', flat=True)
 

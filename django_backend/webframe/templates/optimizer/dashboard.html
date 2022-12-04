@@ -15,22 +15,25 @@
         <thead class="thead-dark">
         <tr>
             <th>Symbol</th>
-            <th style="width:20%">Name</th>
+            <th>Name</th>
+            <!--Metrics-->
+            <th>Calculation date</th>
+            <th>F-score</th>
+            <th>Weighted F-score</th>
             <th>EPS</th>
             <th>P/E Ratio</th>
-            <th>Cash</th>
+            <!--Profitability-->
             <th>Return On Assets (ROA)</th>
-            <th>Accruals</th>
             <th>&#916; Cash</th>
             <th>&#916; ROA</th>
+            <th>Accruals</th>
+            <!--Leverage, Liquidity and Source of Funds-->
             <th>&#916; Long Leverage Ratio</th>
             <th>&#916; Current Leverage Ratio</th>
             <th>&#916; Shares</th>
+            <!--Operating Efficiency-->
             <th>&#916; Gross Margin</th>
             <th>&#916; Asset Turnover</th>
-            <th>F-score</th>
-            <th>Weighted F-score</th>
-            <th>Calculation date</th>
         </tr>
         </thead>
         <tbody>
@@ -39,21 +42,24 @@
         <tr>
             <td>{{i.symbol}}</td>
             <td>{{i.longname}}</td>
+            <!--Metrics-->
+            <td>{{i.date}}</td>
+            <td>{{i.PF_score}}</td>
+            <td>{{i.PF_score_weighted}}</td>
             <td>{{i.EPS}}</td>
             <td>{{i.PE_ratio}}</td>
-            <td>{{i.cash}}</td>
+            <!--Profitability-->
             <td>{{i.ROA}}</td>
-            <td>{{i.accruals}}</td>
             <td>{{i.delta_cash}}</td>
             <td>{{i.delta_ROA}}</td>
+            <td>{{i.accruals}}</td>
+            <!--Leverage, Liquidity and Source of Funds-->
             <td>{{i.delta_long_lev_ratio}}</td>
             <td>{{i.delta_current_lev_ratio}}</td>
             <td>{{i.delta_shares}}</td>
+            <!--Operating Efficiency-->
             <td>{{i.delta_gross_margin}}</td>
             <td>{{i.delta_asset_turnover}}</td>
-            <td>{{i.PF_score}}</td>
-            <td>{{i.PF_score_weighted}}</td>
-            <td>{{i.date}}</td>
         </tr>
         {% endfor %}
         {% endif %}
