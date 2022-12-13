@@ -4,9 +4,11 @@
 from django.urls import reverse_lazy
 from django.http import HttpResponseRedirect
 from django.http.response import HttpResponse
+from django.db.models import Max
 
 from django.views.generic.edit import FormView
 from django.views.generic import ListView
+from django import views
 from django.shortcuts import render
 from rest_framework import viewsets
 
@@ -14,6 +16,9 @@ from django.db.models import Subquery, OuterRef
 
 from webframe import serializers, models, forms
 from optimizer import utils, download, piotroski_fscore
+from optimizer import prediction
+from optimizer import plots
+
 
 from django.utils.decorators import classonlymethod
 from asgiref.sync import sync_to_async
@@ -27,8 +32,9 @@ import json
 def index(request):
     return render(request, "optimizer/index.html")
 
+# uvicorn config.asgi:application --reload
 
-class DashboardView(ListView):
+class DashboardView(views.generic.ListView):
     model = models.Scores
     form_class = forms.OptimizeForm
     template_name = 'optimizer/dashboard.html'
@@ -43,19 +49,22 @@ class DashboardView(ListView):
         context['data_settings'] = models.DataSettings.objects.all()
         context['securities_list'] = models.SecurityList.objects.all().order_by('id')
         context['ticker_list'] = models.SecurityList.objects.all().order_by('symbol')
+        context['plots'] = {}
 
         #### Table from DF ####
         # Only most recent
-        # sq = models.Scores.objects.filter(security_id=OuterRef('security_id')).order_by('-date')
-        # scores = models.Scores.objects.filter(pk=Subquery(sq.values('pk'))).order_by('-security_id').values()
-
+        scores = models.Scores.objects.values('security_id').annotate(most_recent=Max('date'))
+        scores = scores.filter(date__in=scores.values('most_recent')).order_by('-date').values()
         # All
-        scores = models.Scores.objects.all().order_by('-security_id').values()
-
-        # scores = models.Scores.objects.filter(pk=Subquery(sq.values('pk')[:1])).order_by('-security_id').values()
+        # scores = models.Scores.objects.all().order_by('-security_id').values()
         securities = models.SecurityMeta.objects.all().order_by('security_id').values()
 
         if scores.exists() and securities.exists():
+
+            ### FIXME TEST
+            context['plots'] = plots.create_plots()
+            # prediction.expected_return()
+
 
             # Round decimals
             field_dat = models.Scores._meta.get_fields()
@@ -79,13 +88,19 @@ class DashboardView(ListView):
 
         return context
 
-class AddDataView(FormView):
+class AddDataView(views.generic.FormView):
     model = models.Scores
     form_class = forms.AddDataForm
     template_name = 'optimizer/add-data.html'
     success_url = reverse_lazy('add-data')
     snp_list = utils.get_latest_snp()
     snp_tickers = [x['Symbol'] for x in snp_list]
+
+    # @classonlymethod
+    # def as_view(cls, **initkwargs):
+    #     view = super().as_view(**initkwargs)
+    #     view._is_coroutine = asyncio.coroutines._is_coroutine
+    #     return view
 
     def form_valid(self, form):
         if not models.DataSettings.objects.exists():

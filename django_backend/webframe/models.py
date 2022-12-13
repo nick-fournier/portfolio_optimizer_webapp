@@ -65,8 +65,8 @@ class Financials(models.Model):
     discontinued_operations = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     net_income_from_continuing_ops = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     net_income_applicable_to_common_shares = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-    quarterly_close = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-    quarterly_variance = models.DecimalField(max_digits=17, null=True, decimal_places=2)
+    # quarterly_close = models.DecimalField(max_digits=17, null=True, decimal_places=2)
+    # quarterly_variance = models.DecimalField(max_digits=17, null=True, decimal_places=2)
 
 class BalanceSheet(models.Model):
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
@@ -148,4 +148,7 @@ class Scores(models.Model):
     delta_shares = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     delta_gross_margin = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     delta_asset_turnover = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    yearly_close = models.DecimalField(max_digits=17, null=True, decimal_places=2)
+    yearly_variance = models.DecimalField(max_digits=17, null=True, decimal_places=2)
+
 

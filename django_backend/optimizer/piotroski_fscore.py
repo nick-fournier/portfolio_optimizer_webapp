@@ -1,4 +1,4 @@
-from webframe.models import Financials, BalanceSheet, Scores
+from webframe import models
 from django.db.models import Q
 
 import pandas as pd
@@ -64,15 +64,15 @@ class GetFscore:
             # TODO filter on select security IDs to perform partial update
             pass
 
-        if Financials.objects.exists() and BalanceSheet.objects.exists():
+        if models.Financials.objects.exists() and models.BalanceSheet.objects.exists():
             self.year = date.today().year
             self.data = self.get_data()
             self.scores = self.calc_scores()
             self.save_scores()
 
     def get_data(self):
-        financials = pd.DataFrame(Financials.objects.all().values()).drop(columns='id')
-        balancesheet = pd.DataFrame(BalanceSheet.objects.all().values()).drop(columns='id')
+        financials = pd.DataFrame(models.Financials.objects.all().values()).drop(columns='id')
+        balancesheet = pd.DataFrame(models.BalanceSheet.objects.all().values()).drop(columns='id')
         data = balancesheet.merge(financials, on=['date', 'security_id'])
         float_cols = list(set(data.columns).difference(['security_id', 'date']))
         data[float_cols] = data[float_cols].astype(float)
@@ -120,7 +120,22 @@ class GetFscore:
             measures['cash'] = df['cash']
             measures['cash_ratio'] = df['cash'] / df['total_current_liabilities']
             measures['EPS'] = df['net_income_applicable_to_common_shares'] / df['shares_outstanding']
-            measures['PE_ratio'] = df['quarterly_close'] / measures['EPS']
+
+            # Get close price and PE
+            prices = models.SecurityPrice.objects.filter(security_id__in=measures.security_id)
+            prices = pd.DataFrame(prices.values('date', 'security_id', 'close'))
+            prices = prices.rename(columns={'close': 'yearly_close'})
+            prices.yearly_close = prices.yearly_close.astype(float)
+
+            # Calc variance
+            prices.index = pd.to_datetime(prices.date).dt.year
+            var = prices.groupby(level=0).yearly_close.std()**2
+            var = var.reset_index().rename(columns={'yearly_close': 'yearly_variance'}).set_index('date')
+            prices = prices.join(var).reset_index(drop=True)
+            measures = measures.merge(prices, on=['security_id', 'date'], how='left')
+
+            # calc PE
+            measures['PE_ratio'] = measures['yearly_close'] / measures['EPS']
 
             # add to list
             df_measures.append(measures)
@@ -145,7 +160,7 @@ class GetFscore:
         new_scores = new_scores.replace([np.NaN, np.inf, -np.inf], None)
 
         # Check for existing scores in DB
-        old_scores = Scores.objects.filter(
+        old_scores = models.Scores.objects.filter(
                 Q(security_id__in=new_scores['security_id']) &
                 Q(date__in=new_scores['date'])
             ).values('id', 'security_id', 'date')
@@ -165,34 +180,18 @@ class GetFscore:
             # Grab the actual queryset to preserve pk
             old_scores_update = []
             for score in old_scores:
-                score_set = Scores.objects.get(id=score['id'])
+                score_set = models.Scores.objects.get(id=score['id'])
                 for k, v in score.items():
                     setattr(score_set, k, v)
                 old_scores_update.append(score_set)
 
-            Scores.objects.bulk_update(
+            models.Scores.objects.bulk_update(
                 old_scores_update,
                 #old_scores.to_dict('records'),
                 fields=list(new_scores.columns)
             )
 
-        Scores.objects.bulk_create(
-            Scores(**vals) for vals in new_scores.to_dict('records')
+        models.Scores.objects.bulk_create(
+            models.Scores(**vals) for vals in new_scores.to_dict('records')
         )
 
-        # df_template = pd.DataFrame(columns=['security_id', 'date'])
-        # old_scores = pd.DataFrame(
-        #     Scores.objects.filter(
-        #         Q(security_id__in=scores_formatted['security_id']) & Q(date__in=scores_formatted['date'])
-        #     ).values('security_id', 'date')
-        # )
-        #
-        # old_scores = pd.concat([df_template, old_scores], axis=0)
-        #
-        # new_scores = scores_formatted[~(scores_formatted.date.isin(old_scores.date) &
-        #                                 scores_formatted.security_id.isin(old_scores.security_id))]
-        #
-        # if not new_scores.empty:
-        #     Scores.objects.bulk_create(
-        #         Scores(**vals) for vals in new_scores.to_dict('records')
-        #     )

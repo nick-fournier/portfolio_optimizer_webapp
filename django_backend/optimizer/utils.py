@@ -23,7 +23,7 @@ def get_id_table(tickers, add_missing=False):
     return id_table
 
 
-def get_missing(proposed_tickers):
+def get_missing(proposed_tickers, DB=models.Financials):
 
     # First find ones that aren't in database at all
     existing = models.SecurityList.objects.filter(symbol__in=proposed_tickers)
@@ -31,8 +31,7 @@ def get_missing(proposed_tickers):
 
     # Then find any that are out of date
     start_date = models.DataSettings.objects.values_list('start_date').first()[0]
-    existing_todate = models.Financials.objects.filter(Q(security_id__in=existing) &
-                                                       Q(date=start_date))
+    existing_todate = DB.objects.filter(Q(security_id__in=existing) & Q(date=start_date))
 
     # Get the corresponding symbol
     existing_todate = models.SecurityList.objects.filter(id__in=existing_todate).values_list('symbol', flat=True)
@@ -45,17 +44,19 @@ def get_missing(proposed_tickers):
 
     return list(missing)
 
-def clean_records():
+def clean_records(DB_ref_dict=None):
     # DB Reference dic
-    DB_ref = {'financials': models.Financials,
-              'balancesheet': models.BalanceSheet,
-              'dividends': models.Dividends}
-
+    if DB_ref_dict is None:
+        DB_ref_dict = {'financials': models.Financials,
+                  'balancesheet': models.BalanceSheet,
+                  'dividends': models.Dividends,
+                  'securityprice': models.SecurityPrice
+                  }
 
     security_ids = models.SecurityList.objects.values_list('id', flat=True)
 
     incomplete_records = []
-    for db_name, DB in DB_ref.items():
+    for db_name, DB in DB_ref_dict.items():
         db_ids = DB.objects.values_list('security_id', flat=True)
         incomplete_records.extend(set(security_ids).difference(db_ids))
         incomplete_records.extend(set(db_ids).difference(security_ids))
@@ -67,7 +68,7 @@ def clean_records():
         records = models.SecurityList.objects.filter(id__in=incomplete_records)
         records.delete()
 
-        for db_name, DB in DB_ref.items():
+        for db_name, DB in DB_ref_dict.items():
             records = DB.objects.filter(security_id__in=incomplete_records)
             if records.exists():
                 records.delete()

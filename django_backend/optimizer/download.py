@@ -24,26 +24,31 @@ class DownloadCompanyData:
         self.end_date = datetime.date.today().strftime("%Y-%m-%d")
         self.DB_ref = {'financials': models.Financials,
                        'balancesheet': models.BalanceSheet,
-                       'dividends': models.Dividends}
+                       'dividends': models.Dividends,
+                       'securityprice': models.SecurityPrice}
 
         # Cleanup any incomplete records before we do anything
-        utils.clean_records()
+        utils.clean_records(self.DB_ref)
 
         # get data
         if self.the_tickers:
             # Generate ID for new security if missing
             self.id_table = utils.get_id_table(self.the_tickers, add_missing=True)
-            self.get_data()
+            self.get_company_data()
+            self.get_price_data()
             self.set_meta()
-            self.set_data()
+
+            for db_name in self.DB_ref.keys():
+                # TODO save local backup data to csv?
+                self.set_data(db_name)
+
             piotroski_fscore.GetFscore()
-
-
+            print('Database update complete')
         else:
             print('No new tickers to update.')
 
 
-    def get_data(self):
+    def get_company_data(self):
         print('Downloading stock data for:')
         for c in utils.chunked_iterable(self.the_tickers, 25):
             print(' '.join(c))
@@ -75,6 +80,7 @@ class DownloadCompanyData:
                     df['security_id'] = s_id
                     # Add to df list to be concatenated
                     data_dict[df_name].append(df)
+
             except:
                 print("Couldn't get " + t + ', removing from list.')
                 models.SecurityList.objects.filter(id=s_id).delete()
@@ -102,6 +108,27 @@ class DownloadCompanyData:
             left_on=[self.data['financials'].date.dt.quarter, 'security_id'],
             right_on=['quarter', 'security_id']).drop('quarter', axis=1)
 
+    def get_price_data(self):
+        print('Downloading stock data for:')
+        for c in utils.chunked_iterable(self.the_tickers, 25):
+            print(' '.join(c))
+
+        # Get price data if requested
+        print('Downloading price data...')
+        price_data = yf.download(self.the_tickers,
+                                 group_by='ticker',
+                                 start=self.start_date,
+                                 end=self.end_date)
+
+        # Flatten out so that symbol is column
+        price_data = utils.flatten_prices(price_data, self.the_tickers)
+
+        # Convert symbol to security id
+        price_data.columns = price_data.columns.str.lower()
+        price_data = self.id_table.merge(price_data, on='symbol').drop(columns='symbol')
+
+        self.data['securityprice'] = price_data
+
     def set_meta(self):
         ids_in_meta = models.SecurityMeta.objects.all().values_list('symbol', flat=True)
         if list(set(self.the_tickers).difference(ids_in_meta)):
@@ -124,7 +151,7 @@ class DownloadCompanyData:
 
             # Subset select columns & add security id
             meta = meta[meta_fields]
-            meta.loc[:, 'fulltime_employees'] = meta['fulltime_employees'].fillna(-1).astype(int).replace({-1: None})
+            meta = meta.astype(object).where(meta.notna(), None)
 
             # Merge security id
             meta = meta.merge(self.id_table, on='symbol')
@@ -136,78 +163,28 @@ class DownloadCompanyData:
         else:
             print('Meta data already up to date')
 
-    def set_data(self):
-        for db_name in self.DB_ref.keys():
-            Database = self.DB_ref[db_name]
-            data = self.data[db_name]
-            data.columns = [x.lower().replace(' ', '_') for x in data.columns]
-            data = data.replace({pd.NaT: None})
+    def set_data(self, db_name):
+        DB = self.DB_ref[db_name]
+        data = self.data[db_name]
+        data.columns = [x.lower().replace(' ', '_') for x in data.columns]
+        data = data.replace({pd.NaT: None})
 
-            Qfilter = Q(security_id__in=data['security_id']) & Q(date__in=data['date'])
-            old_data = pd.DataFrame(Database.objects.filter(Qfilter).values('security_id', 'date'))
-            if old_data.empty:
-                old_data = pd.DataFrame(columns=['security_id', 'date'])
+        # remove fields we don't have
+        if db_name == 'financials':
+            data = data.drop(columns=['quarterly_close', 'quarterly_variance'])
 
-            new_data = data[~(data.date.isin(old_data.date) & data.security_id.isin(old_data.security_id))]
+        Qfilter = Q(security_id__in=data['security_id']) & Q(date__in=data['date'])
+        old_data = pd.DataFrame(DB.objects.filter(Qfilter).values('security_id', 'date'))
+        if old_data.empty:
+            old_data = pd.DataFrame(columns=['security_id', 'date'])
 
-            # Fix NaNs
-            new_data = new_data.astype(object).where(new_data.notna(), None)
-            if not new_data.empty:
-                print('Updating ' + db_name + ' data...')
-                Database.objects.bulk_create(Database(**vals) for vals in new_data.to_dict('records'))
-            else:
-                print(db_name + ' already up to date')
-        print('Database update complete')
+        new_data = data[~(data.date.isin(old_data.date) & data.security_id.isin(old_data.security_id))]
 
-class DownloadStockData:
-    def __init__(self, tickers, updates=True):
-        # Initialize dataframes
-        self.prices = pd.DataFrame()
-
-        # Parameters
-        self.id_table = utils.get_id_table(tickers)
-        self.start_date = models.DataSettings.objects.first().start_date
-        self.end_date = datetime.date.today().strftime("%Y-%m-%d")
-
-        # Get existing symbols, remove existing from list
-        self.the_tickers = utils.get_missing(tickers)
-
-        # get data
-        if self.the_tickers:
-            self.get_data()
-            self.set_data()
-        else:
-            print('No new tickers to update.')
-
-    def get_data(self):
-        print('Downloading stock data for:')
-        for c in utils.chunked_iterable(self.the_tickers, 25):
-            print(' '.join(c))
-
-        # Get price data if requested
-        print('Downloading price data...')
-        price_data = yf.download(self.the_tickers,
-                             group_by='ticker',
-                             start=self.start_date,
-                             end=self.end_date)
-
-        #Flatten out so that symbol is column
-        self.price_data = utils.flatten_prices(price_data, self.the_tickers)
-
-    def set_data(self):
-        self.price_data.columns = [x.lower().replace(' ', '_') for x in self.price_data.columns]
-        self.price_data = self.price_data.replace({pd.NaT: None})
-
-        Qfilter = Q(security_id__in=self.price_data['security_id']) & Q(date__in=self.price_data['date'])
-        old_data = pd.DataFrame(columns=['security_id', 'date'])
-        old_data = old_data.append(pd.DataFrame(models.SecurityPrice.objects.filter(Qfilter).values('security_id', 'date')))
-        new_data = self.price_data[~(self.price_data.date.isin(old_data.date) &
-                                     self.price_data.security_id.isin(old_data.security_id))]
-
+        # Fix NaNs
+        new_data = new_data.astype(object).where(new_data.notna(), None)
         if not new_data.empty:
-            print('Updating stock price data...')
-            models.SecurityPrice.objects.bulk_create(models.SecurityPrice(**vals) for vals in new_data.to_dict('records'))
+            print('Updating ' + db_name + ' data...')
+            DB.objects.bulk_create(DB(**vals) for vals in new_data.to_dict('records'))
         else:
-            print('Stock price data already up to date')
-        print('Database update complete')
+            print(db_name + ' already up to date')
 
