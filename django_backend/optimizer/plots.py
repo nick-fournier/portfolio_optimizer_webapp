@@ -2,7 +2,7 @@ import pandas as pd
 import seaborn as sns
 
 import matplotlib.pyplot as plt
-from optimizer import prediction
+from optimizer import optimization
 from io import BytesIO
 import base64
 import datetime
@@ -13,22 +13,17 @@ from plotly.offline import plot
 pd.options.plotting.backend = "plotly"
 
 
-def pct_change(close):
-    return close.pct_change(1)
-    # return 100*(close - close.iloc[0])/close.iloc[0]
-
 def create_plots(plot_data=None):
     if not plot_data:
-        plot_data = prediction.get_analysis_data()
-
-    df = plot_data.dropna()
+        plot_data = optimization.get_analysis_data()
+    df = plot_data
 
     plots = {}
     # plots['pct_date'] = sns.lineplot(data=df.dropna(), x="date", y="pct_chg", hue="security_id")
     # plots = {k: encode_plot(v) for k, v in plots.items()}
 
     # plots['pct_date'] = df.plot.scatter(x="date", y="pct_chg")
-    plots['pct_date'] = px.scatter(df, x="date", y="pct_chg", color="security_id")
+    plots['pct_date'] = px.scatter(df, x="date", y="cum_pct_chg", color="security_id")
 
     plots = {k: plot(fig, output_type="div") for k, fig in plots.items()}
 

@@ -15,10 +15,7 @@ from rest_framework import viewsets
 from django.db.models import Subquery, OuterRef
 
 from webframe import serializers, models, forms
-from optimizer import utils, download, piotroski_fscore
-from optimizer import prediction
-from optimizer import plots
-
+from optimizer import utils, download, piotroski_fscore, optimization, plots
 
 from django.utils.decorators import classonlymethod
 from asgiref.sync import sync_to_async
@@ -42,6 +39,7 @@ class DashboardView(views.generic.ListView):
 
     def post(self, request, *args, **kwargs):
         piotroski_fscore.GetFscore()
+        optimization.optimize()
         return HttpResponseRedirect(reverse_lazy('dashboard'))
 
     def get_context_data(self, **kwargs):
@@ -63,8 +61,6 @@ class DashboardView(views.generic.ListView):
 
             ### FIXME TEST
             context['plots'] = plots.create_plots()
-            # prediction.expected_return()
-
 
             # Round decimals
             field_dat = models.Scores._meta.get_fields()
