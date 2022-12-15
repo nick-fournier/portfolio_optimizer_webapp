@@ -3,16 +3,12 @@
 
 from django.urls import reverse_lazy
 from django.http import HttpResponseRedirect
-from django.http.response import HttpResponse
 from django.db.models import Max
 
 from django.views.generic.edit import FormView
-from django.views.generic import ListView
 from django import views
 from django.shortcuts import render
 from rest_framework import viewsets
-
-from django.db.models import Subquery, OuterRef
 
 from webframe import serializers, models, forms
 from optimizer import utils, download, piotroski_fscore, optimization, plots
@@ -21,6 +17,7 @@ from django.utils.decorators import classonlymethod
 from asgiref.sync import sync_to_async
 import asyncio
 
+import datetime
 import pandas as pd
 import json
 
@@ -55,7 +52,8 @@ class DashboardView(views.generic.ListView):
         scores = scores.filter(date__in=scores.values('most_recent')).order_by('-date').values()
         # All
         # scores = models.Scores.objects.all().order_by('-security_id').values()
-        securities = models.SecurityMeta.objects.all().order_by('security_id').values()
+        # securities = models.SecurityMeta.objects.all().order_by('security_id').values()
+        securities = models.SecurityList.objects.all().order_by('pk').values()
 
         if scores.exists() and securities.exists():
 
@@ -134,6 +132,13 @@ class AddDataView(views.generic.FormView):
             # df_tickers.start_date.dt.strftime('%m/%d/%Y')
             snp_data = df_snp.merge(df_tickers, on='symbol', how='left')
         snp_data = snp_data.astype(object).where(snp_data.notna(), None)
+
+        if not models.DataSettings.objects.exists():
+            data_settings = models.DataSettings(
+                start_date=datetime.date(2010, 1, 1),
+                investment_amount=10000
+            )
+            data_settings.save()
 
         context['snp_list'] = snp_data.to_dict('records')
         context['data_settings'] = models.DataSettings.objects.values('start_date').first()

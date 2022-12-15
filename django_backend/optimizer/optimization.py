@@ -93,13 +93,12 @@ def forecast_expected_returns(company_df):
 
 
 def optimize():
-
     # Forecast expected returns
     company_df = get_analysis_data()
     expected_returns = forecast_expected_returns(company_df)
 
     # Some formatting
-    prices = pd.DataFrame(models.SecurityPrice.objects.all().values('security_id', 'date', 'close'))
+    prices = pd.DataFrame(models.SecurityPrice.objects.filter(security_id__in=company_df.security_id).values('security_id', 'date', 'close'))
     prices.date = pd.to_datetime(prices.date)
     prices.close = prices.close.astype(float)
 
@@ -134,11 +133,11 @@ def optimize():
         pd.Series(disc_allocation, name='shares')
     ], axis=1)
 
-    # Sent to data base
-    # TODO. NEED TO MAKE THE MODEL IN THE DB
-
-    return df_allocation
-
+    # Send to database
+    if not df_allocation.empty:
+        models.Portfolio.objects.bulk_create(
+            models.Portfolio(**vals) for vals in df_allocation.to_dict('records')
+        )
 
 
 

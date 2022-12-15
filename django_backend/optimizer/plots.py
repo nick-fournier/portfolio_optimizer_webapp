@@ -23,7 +23,7 @@ def create_plots(plot_data=None):
     # plots = {k: encode_plot(v) for k, v in plots.items()}
 
     # plots['pct_date'] = df.plot.scatter(x="date", y="pct_chg")
-    plots['pct_date'] = px.scatter(df, x="date", y="cum_pct_chg", color="security_id")
+    plots['pct_date'] = px.line(df, x="date", y="cum_pct_chg", color="security_id")
 
     plots = {k: plot(fig, output_type="div") for k, fig in plots.items()}
 

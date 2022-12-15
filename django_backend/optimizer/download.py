@@ -130,12 +130,13 @@ class DownloadCompanyData:
         self.data['securityprice'] = price_data
 
     def set_meta(self):
-        ids_in_meta = models.SecurityMeta.objects.all().values_list('symbol', flat=True)
+        # ids_in_meta = models.SecurityMeta.objects.all().values_list('symbol', flat=True)
+        ids_in_meta = models.SecurityList.objects.all().values_list('symbol', flat=True)
         if list(set(self.the_tickers).difference(ids_in_meta)):
             print('Updating meta data...')
             # Get field names from model, remove related model names
-            exclude = list(apps.all_models['webframe'].keys()) + ['id'] + ['security']
-            meta_fields = [field.name for field in models.SecurityMeta._meta.get_fields()]
+            exclude = list(apps.all_models['webframe'].keys()) + ['id', 'security', 'last_updated', 'first_created']
+            meta_fields = [field.name for field in models.SecurityList._meta.get_fields()]
             meta_fields = [x for x in meta_fields if x not in exclude]
             renames = {'longbusinesssummary': 'business_summary',
                        'fulltimeemployees': 'fulltime_employees'}
@@ -154,12 +155,29 @@ class DownloadCompanyData:
             meta = meta.astype(object).where(meta.notna(), None)
 
             # Merge security id
-            meta = meta.merge(self.id_table, on='symbol')
+            meta = meta.merge(self.id_table.rename(columns={'security_id': 'pk'}), on='symbol')
 
             if not meta.empty:
-                models.SecurityMeta.objects.bulk_create(
-                    models.SecurityMeta(**vals) for vals in meta.to_dict('records')
-                )
+                # models.SecurityMeta.objects.bulk_create(
+                #     models.SecurityMeta(**vals) for vals in meta.to_dict('records')
+                # )
+
+                # create a list of user objects that need to be updated in bulk update
+                meta_bulk_update_list = []
+                meta_iter = zip(meta.pk, meta[meta_fields].to_dict(orient='records'))
+
+                for key, values_dict in meta_iter:
+                    meta = models.SecurityList.objects.get(id=key)
+
+                    for field, value in values_dict.items():
+                        setattr(meta, field, value)
+
+                    meta_bulk_update_list.append(meta)
+
+                # Bulk update
+                models.SecurityList.objects.bulk_update(meta_bulk_update_list, meta_fields)
+
+
         else:
             print('Meta data already up to date')
 

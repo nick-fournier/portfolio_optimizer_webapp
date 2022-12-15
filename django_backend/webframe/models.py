@@ -1,34 +1,51 @@
+import datetime
+
 from django.db import models
 
-# Create your models here.
-# https://analyzingalpha.com/create-an-equities-database
 
-# class Exchange(models.Model):
-#     name = models.CharField(max_length=50)
-#     acronym = models.CharField(max_length=50)
-
-#TODO Clean up the data fields to be more efficent (e.g., divide by million, as int, etc.
+# TODO Clean up the data fields to be more efficent (e.g., divide by million, as int, etc.
+# Or at least convert int to IntegerFields. May cause issue with NAs?
 
 class DataSettings(models.Model):
-    start_date = models.DateField()
+    start_date = models.DateField(default=datetime.date(2010, 1, 1))
+    investment_amount = models.DecimalField(max_digits=17, null=True, decimal_places=2, default=10000)
 
 class SecurityList(models.Model):
     symbol = models.CharField(default=None, null=True, max_length=12)
     last_updated = models.DateTimeField(auto_now=True)
-    first_updated = models.DateTimeField(auto_now_add=True)
-
-class SecurityMeta(models.Model):
+    first_created = models.DateTimeField(auto_now_add=True)
     # exchange_id = models.ForeignKey(Exchange, on_delete=models.CASCADE)
-    security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
     currency = models.CharField(default=None, null=True, max_length=3)
-    symbol = models.CharField(default=None, null=True, max_length=12)
     longname = models.CharField(default=None, null=True, max_length=100)
     country = models.CharField(default=None, null=True, max_length=100)
     sector = models.CharField(default=None, null=True, max_length=50)
     industry = models.CharField(default=None, null=True, max_length=50)
     logo_url = models.CharField(default=None, null=True, max_length=100)
-    fulltime_employees = models.IntegerField(default=None, null=True)  # fullTimeEmployees
-    business_summary = models.CharField(default=None, null=True, max_length=3000)       # longBusinessSummary
+    fulltime_employees = models.IntegerField(default=None, null=True)
+    business_summary = models.CharField(default=None, null=True, max_length=3000)
+
+    def __str__(self):
+        return self.symbol
+
+class Portfolio(models.Model):
+    security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
+    symbol = models.CharField(default=None, null=True, max_length=12)
+    allocation = models.DecimalField(max_digits=10, null=True, decimal_places=6)
+    shares = models.IntegerField(default=None, null=True)
+
+# TODO Merge this and the SecurityList?
+# class SecurityMeta(models.Model):
+#     # exchange_id = models.ForeignKey(Exchange, on_delete=models.CASCADE)
+#     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
+#     currency = models.CharField(default=None, null=True, max_length=3)
+#     symbol = models.CharField(default=None, null=True, max_length=12)
+#     longname = models.CharField(default=None, null=True, max_length=100)
+#     country = models.CharField(default=None, null=True, max_length=100)
+#     sector = models.CharField(default=None, null=True, max_length=50)
+#     industry = models.CharField(default=None, null=True, max_length=50)
+#     logo_url = models.CharField(default=None, null=True, max_length=100)
+#     fulltime_employees = models.IntegerField(default=None, null=True)
+#     business_summary = models.CharField(default=None, null=True, max_length=3000)
 
 class SecurityPrice(models.Model):
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
