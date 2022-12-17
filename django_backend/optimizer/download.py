@@ -24,23 +24,33 @@ class DownloadCompanyData:
         self.end_date = datetime.date.today().strftime("%Y-%m-%d")
         self.DB_ref = {'financials': models.Financials,
                        'balancesheet': models.BalanceSheet,
-                       'dividends': models.Dividends,
-                       'securityprice': models.SecurityPrice}
+                       # 'dividends': models.Dividends,
+                       'securityprice': models.SecurityPrice
+                       }
 
         # Cleanup any incomplete records before we do anything
-        utils.clean_records(self.DB_ref)
+        utils.clean_records()
+        self.download()
 
+    def download(self):
         # get data
         if self.the_tickers:
             # Generate ID for new security if missing
             self.id_table = utils.get_id_table(self.the_tickers, add_missing=True)
-            self.get_company_data()
-            self.get_price_data()
-            self.set_meta()
 
-            for db_name in self.DB_ref.keys():
-                # TODO save local backup data to csv?
-                self.set_data(db_name)
+            # Fetch the company data (balance sheet, financials, etc.)
+            self.get_company_data()
+
+            # Ensure meta set correctly, rerun clean if not
+            incomplete = models.SecurityList.objects.filter(sector__isnull=True)
+            if incomplete:
+                incomplete.delete()
+                utils.clean_records(self.DB_ref)
+
+            if self.data:
+                for db_name in self.DB_ref.keys():
+                    # TODO save local backup data to csv?
+                    self.set_data(db_name)
 
             piotroski_fscore.GetFscore()
             print('Database update complete')
@@ -56,18 +66,20 @@ class DownloadCompanyData:
         stock_data = yf.Tickers(self.the_tickers)
         pbar = ProgressBar()
         data_dict = {k: [] for k in ['meta', 'financials', 'balancesheet', 'dividends']}
+
         for t in pbar(stock_data.symbols):
             s_id = int(self.id_table.loc[self.id_table['symbol'] == t].security_id.item())
+            df_dict = {}
+
+            # TODO Check for local data first before scraping
             try:
                 obj = stock_data.tickers.get(t)
-
-                df_dict = {}
                 df_dict['meta'] = pd.DataFrame([obj.info])
                 df_dict['financials'] = obj.financials.T.reset_index().rename(columns={"": "date"})
                 df_dict['balancesheet'] = obj.balancesheet.T.reset_index().rename(columns={"": "date"})
                 # df_dict['financials'] = obj.quarterly_financials.T.reset_index().rename(columns={"": "date"})
                 # df_dict['balancesheet'] = obj.quarterly_balancesheet.T.reset_index().rename(columns={"": "date"})
-                df_dict['dividends'] = obj.dividends.reset_index().dropna()
+                # df_dict['dividends'] = obj.dividends.reset_index().dropna()
 
                 # Add shares outstanding to balance sheet
                 df_dict['balancesheet'].index = df_dict['balancesheet'].date.dt.year
@@ -85,6 +97,10 @@ class DownloadCompanyData:
                 print("Couldn't get " + t + ', removing from list.')
                 models.SecurityList.objects.filter(id=s_id).delete()
                 self.the_tickers = set(self.the_tickers).difference([t])
+
+        # Check if completely empty before proceeding
+        if not self.data:
+            return
 
         # Concatenate the final data
         self.data = {k: pd.concat(v, axis=0) for k, v in data_dict.items()}
@@ -108,6 +124,10 @@ class DownloadCompanyData:
             left_on=[self.data['financials'].date.dt.quarter, 'security_id'],
             right_on=['quarter', 'security_id']).drop('quarter', axis=1)
 
+        self.get_price_data()
+        self.set_meta()
+
+
     def get_price_data(self):
         print('Downloading stock data for:')
         for c in utils.chunked_iterable(self.the_tickers, 25):
@@ -130,9 +150,10 @@ class DownloadCompanyData:
         self.data['securityprice'] = price_data
 
     def set_meta(self):
-        # ids_in_meta = models.SecurityMeta.objects.all().values_list('symbol', flat=True)
-        ids_in_meta = models.SecurityList.objects.all().values_list('symbol', flat=True)
-        if list(set(self.the_tickers).difference(ids_in_meta)):
+        incomplete_ids = [k for k, v in models.SecurityList.objects.values_list('symbol', 'sector') if v is None]
+        incomplete_ids = list(set(self.the_tickers).intersection(incomplete_ids))
+
+        if incomplete_ids:
             print('Updating meta data...')
             # Get field names from model, remove related model names
             exclude = list(apps.all_models['webframe'].keys()) + ['id', 'security', 'last_updated', 'first_created']

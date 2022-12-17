@@ -42,40 +42,39 @@ class DashboardView(views.generic.ListView):
     def get_context_data(self, **kwargs):
         context = super(DashboardView, self).get_context_data(**kwargs)
         context['data_settings'] = models.DataSettings.objects.all()
-        context['securities_list'] = models.SecurityList.objects.all().order_by('id')
-        context['ticker_list'] = models.SecurityList.objects.all().order_by('symbol')
         context['plots'] = {}
 
-        #### Table from DF ####
+        # Get scores + symbol
+        related_fields = ['security__symbol', 'security__longname',
+                          'security__portfolio__shares', 'security__portfolio__allocation']
+        scores_fields = [field.name for field in models.Scores._meta.get_fields()]
+        scores_fields += related_fields
+
         # Only most recent
         scores = models.Scores.objects.values('security_id').annotate(most_recent=Max('date'))
-        scores = scores.filter(date__in=scores.values('most_recent')).order_by('-date').values()
-        # All
-        # scores = models.Scores.objects.all().order_by('-security_id').values()
-        # securities = models.SecurityMeta.objects.all().order_by('security_id').values()
-        securities = models.SecurityList.objects.all().order_by('pk').values()
+        scores = scores.filter(date__in=scores.values('most_recent')).order_by('-date').values(*scores_fields)
 
-        if scores.exists() and securities.exists():
-
-            ### FIXME TEST
+        if scores.exists():
             context['plots'] = plots.create_plots()
 
             # Round decimals
-            field_dat = models.Scores._meta.get_fields()
+            field_dat = models.Scores._meta.get_fields() + models.Portfolio._meta.get_fields()
             decimal_fields = [x.name for x in field_dat if x.get_internal_type() == 'DecimalField']
 
-            df_scores = pd.DataFrame(scores).astype({x: float for x in decimal_fields})
+            # Formatting
+            df_scores = pd.DataFrame(scores)
+            df_scores = df_scores.astype({x: float for x in decimal_fields if x in df_scores.columns})
+            df_scores = df_scores.rename(columns={x: x.split('__')[-1] for x in related_fields})
+
+            df_scores.allocation = round(100 * df_scores.allocation.astype(float), 2).astype(str) + "%"
             df_scores = df_scores.round({x: 3 for x in decimal_fields})
             df_scores.cash = '$' + (df_scores.cash / 1e6).astype(str) + 'm'
-
-            # Merge with other data
-            df = df_scores.merge(pd.DataFrame(securities), on='security_id')
-            df['date'] = [x.strftime("%Y-%m-%d") for x in df['date']]
-            df = df.sort_values(['symbol', 'date', 'PF_score'], ascending=False).reset_index(drop=True)
-            df.index += 1
+            df_scores['date'] = [x.strftime("%Y-%m-%d") for x in df_scores['date']]
+            df_scores = df_scores.sort_values(['symbol', 'date', 'PF_score'], ascending=False).reset_index(drop=True)
+            df_scores.index += 1
 
             # parsing the DataFrame in json format.
-            json_records = df.reset_index().to_json(orient='records')
+            json_records = df_scores.reset_index().to_json(orient='records')
             data = list(json.loads(json_records))
 
             context['score_table'] = data
@@ -120,7 +119,10 @@ class AddDataView(views.generic.FormView):
         context = super(AddDataView, self).get_context_data(**kwargs)
 
         # Get list of snp data
-        df_tickers = pd.DataFrame(models.SecurityList.objects.filter(symbol__in=self.snp_tickers).values())
+        df_tickers = models.SecurityList.objects.filter(symbol__in=self.snp_tickers)
+        df_tickers = df_tickers.values('symbol', 'last_updated', 'first_created')
+        df_tickers = pd.DataFrame(df_tickers)
+
         df_snp = pd.DataFrame(self.snp_list)
         df_snp.columns = df_snp.columns.str.lower()
 
@@ -133,6 +135,7 @@ class AddDataView(views.generic.FormView):
             snp_data = df_snp.merge(df_tickers, on='symbol', how='left')
         snp_data = snp_data.astype(object).where(snp_data.notna(), None)
 
+        # Default data settings
         if not models.DataSettings.objects.exists():
             data_settings = models.DataSettings(
                 start_date=datetime.date(2010, 1, 1),

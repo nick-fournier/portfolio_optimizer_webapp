@@ -98,7 +98,8 @@ def optimize():
     expected_returns = forecast_expected_returns(company_df)
 
     # Some formatting
-    prices = pd.DataFrame(models.SecurityPrice.objects.filter(security_id__in=company_df.security_id).values('security_id', 'date', 'close'))
+    prices = models.SecurityPrice.objects.filter(security_id__in=company_df.security_id)
+    prices = pd.DataFrame(prices.values('security_id', 'date', 'close'))
     prices.date = pd.to_datetime(prices.date)
     prices.close = prices.close.astype(float)
 
@@ -123,18 +124,17 @@ def optimize():
                                          short_ratio=None).greedy_portfolio()
 
     # Format into dataframe
-    symbol_ids = models.SecurityList.objects.filter(id__in=prices.security_id.unique()).values('id', 'symbol')
-    symbol_ids = pd.DataFrame(symbol_ids).set_index('id')
-    symbol_ids.index.name = 'security_id'
-
     df_allocation = pd.concat([
-        symbol_ids,
         pd.Series(weights, name='allocation'),
         pd.Series(disc_allocation, name='shares')
     ], axis=1)
+    df_allocation.index.name = 'security_id'
+    df_allocation.reset_index(inplace=True)
 
     # Send to database
     if not df_allocation.empty:
+        if models.Portfolio.objects.exists():
+            models.Portfolio.objects.all().delete()
         models.Portfolio.objects.bulk_create(
             models.Portfolio(**vals) for vals in df_allocation.to_dict('records')
         )

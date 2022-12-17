@@ -47,13 +47,17 @@ def get_missing(proposed_tickers, DB=models.Financials):
 def clean_records(DB_ref_dict=None):
     # DB Reference dic
     if DB_ref_dict is None:
-        DB_ref_dict = {'financials': models.Financials,
-                  'balancesheet': models.BalanceSheet,
-                  'dividends': models.Dividends,
-                  'securityprice': models.SecurityPrice
-                  }
+        DB_ref_dict = {
+            'financials': models.Financials,
+            'balancesheet': models.BalanceSheet,
+            # 'dividends': models.Dividends,
+            'securityprice': models.SecurityPrice,
+            'scores': models.Scores,
+            'portfolio': models.Portfolio
+        }
 
     security_ids = models.SecurityList.objects.values_list('id', flat=True)
+
 
     incomplete_records = []
     for db_name, DB in DB_ref_dict.items():
