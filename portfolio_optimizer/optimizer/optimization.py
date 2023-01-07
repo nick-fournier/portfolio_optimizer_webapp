@@ -8,7 +8,7 @@
 
 """
 
-from webframe import models
+from portfolio_optimizer.webframe import models
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression

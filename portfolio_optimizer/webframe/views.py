@@ -10,12 +10,8 @@ from django import views
 from django.shortcuts import render
 from rest_framework import viewsets
 
-from webframe import serializers, models, forms
-from optimizer import utils, download, piotroski_fscore, optimization, plots
-
-from django.utils.decorators import classonlymethod
-from asgiref.sync import sync_to_async
-import asyncio
+from portfolio_optimizer.webframe import forms, models, serializers
+from portfolio_optimizer.optimizer import utils, download, piotroski_fscore, optimization, plots
 
 import datetime
 import pandas as pd

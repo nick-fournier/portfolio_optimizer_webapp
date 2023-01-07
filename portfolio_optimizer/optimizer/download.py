@@ -1,10 +1,10 @@
 
 from django.apps import apps
-from webframe import models
-from optimizer import piotroski_fscore
+from portfolio_optimizer.webframe import models
+from portfolio_optimizer.optimizer import piotroski_fscore
 from django.db.models import Q
 
-from optimizer import utils
+from portfolio_optimizer.optimizer import utils
 import pandas as pd
 import yfinance as yf
 import datetime

@@ -43,7 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'webframe',
+    'portfolio_optimizer.webframe',
     'crispy_forms',
     'corsheaders',
     'rest_framework'

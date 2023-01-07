@@ -1,11 +1,8 @@
 import pandas as pd
-import seaborn as sns
 
-import matplotlib.pyplot as plt
-from optimizer import optimization
+from portfolio_optimizer.optimizer import optimization
 from io import BytesIO
 import base64
-import datetime
 
 import plotly.express as px
 from plotly.offline import plot

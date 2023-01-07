@@ -1,10 +1,9 @@
 import json
-import datetime
 import pandas as pd
 from urllib import request
 from itertools import islice
 from django.db.models import Q
-from webframe import models
+from portfolio_optimizer.webframe import models
 
 
 def get_id_table(tickers, add_missing=False):

@@ -3,7 +3,7 @@ from django.core import validators
 from django.forms import ModelForm
 from django.forms.widgets import DateInput
 
-from webframe import models
+from portfolio_optimizer.webframe import models
 
 from django.db.utils import OperationalError
 import datetime

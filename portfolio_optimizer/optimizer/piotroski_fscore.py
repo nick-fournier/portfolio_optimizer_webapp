@@ -1,4 +1,4 @@
-from webframe import models
+from portfolio_optimizer.webframe import models
 from django.db.models import Q
 
 import pandas as pd
