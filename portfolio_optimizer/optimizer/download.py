@@ -52,13 +52,14 @@ class DownloadCompanyData:
                     # TODO save local backup data to csv?
                     self.set_data(db_name)
 
+
             piotroski_fscore.GetFscore()
             print('Database update complete')
         else:
             print('No new tickers to update.')
 
 
-    def get_company_data(self):
+    def get_company_data(self, cache=True):
         print('Downloading stock data for:')
         for c in utils.chunked_iterable(self.the_tickers, 25):
             print(' '.join(c))
@@ -126,6 +127,9 @@ class DownloadCompanyData:
 
         self.get_price_data()
         self.set_meta()
+
+        if cache:
+            pass
 
 
     def get_price_data(self):
@@ -227,3 +231,5 @@ class DownloadCompanyData:
         else:
             print(db_name + ' already up to date')
 
+    def cache_data(self):
+        pass

@@ -5,6 +5,7 @@ from django.urls import reverse_lazy
 from django.http import HttpResponseRedirect
 from django.db.models import Max
 
+
 from django.views.generic.edit import FormView
 from django import views
 from django.shortcuts import render
@@ -85,14 +86,9 @@ class AddDataView(views.generic.FormView):
     snp_list = utils.get_latest_snp()
     snp_tickers = [x['Symbol'] for x in snp_list]
 
-    # @classonlymethod
-    # def as_view(cls, **initkwargs):
-    #     view = super().as_view(**initkwargs)
-    #     view._is_coroutine = asyncio.coroutines._is_coroutine
-    #     return view
 
     def form_valid(self, form):
-        if not models.DataSettings.objects.exists():
+        if not models.DataSettings.objects.exists() or not self.request.user.is_authenticated:
             return HttpResponseRedirect(reverse_lazy('add-data'))
 
         symbols = form.cleaned_data['symbols']
