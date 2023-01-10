@@ -1,10 +1,15 @@
+import datetime
+import os
 import json
 import pandas as pd
+import time
 from urllib import request
 from itertools import islice
 from django.db.models import Q
 from portfolio_optimizer.webframe import models
 
+
+THIS_PATH = os.path.dirname(__file__)
 
 def get_id_table(tickers, add_missing=False):
     # if missing from security list, add it
@@ -58,7 +63,6 @@ def clean_records(DB_ref_dict=None):
 
     security_ids = models.SecurityList.objects.values_list('id', flat=True)
 
-
     incomplete_records = []
     for db_name, DB in DB_ref_dict.items():
         db_ids = DB.objects.values_list('security_id', flat=True)
@@ -79,17 +83,39 @@ def clean_records(DB_ref_dict=None):
 
 
 def get_latest_snp():
-    # Fetch S&P500 list
-    url = 'https://pkgstore.datahub.io/core/s-and-p-500-companies/362/datapackage.json'
-    response = request.urlopen(url)
-    package = json.loads(response.read())
+    json_path = os.path.join(THIS_PATH, '../fixtures/snp.json')
+    today = datetime.datetime.today().date()
+    timestamp = (datetime.datetime.today() - datetime.timedelta(days=1)).date()
+    # Default timestamp will always fetch data
 
-    # Path of current listing
-    path = [x['path'] for x in package['resources'] if x['datahub']['type'] == 'derived/json'].pop()
+    if os.path.exists(json_path):
+        # Get age of file
+        mtime = os.stat(json_path).st_mtime
+        timestamp = datetime.datetime.fromtimestamp(mtime).date()
 
-    # Fetch the list as JSOn with Name, Sector, and Symbols fields
-    response = request.urlopen(path)
-    snp = json.loads(response.read())
+    if timestamp < today:
+        # Fetch S&P500 list
+        url = 'https://pkgstore.datahub.io/core/s-and-p-500-companies/362/datapackage.json'
+        response = request.urlopen(url)
+        package = json.loads(response.read())
+
+        # Path of current listing
+        path = [x['path'] for x in package['resources'] if x['datahub']['type'] == 'derived/json'].pop()
+
+        # Fetch the list as JSOn with Name, Sector, and Symbols fields
+        response = request.urlopen(path)
+        snp = json.loads(response.read())
+
+        # Serializing pretty json
+        json_object = json.dumps(snp, indent=4)
+
+        # Writing to json
+        with open(json_path, "w") as f:
+            f.write(json_object)
+    else:
+        # Reading json
+        with open(json_path) as f:
+            snp = json.load(f)
 
     return snp
 

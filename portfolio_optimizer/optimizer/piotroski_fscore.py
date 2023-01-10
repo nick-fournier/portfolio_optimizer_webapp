@@ -30,6 +30,7 @@ def calc_delta(series, as_percent = False):
     return delta
 
 def calc_pf_score(df, weighted=False):
+
     # 1 point if positive
     pos_cols = ['ROA', 'delta_cash', 'delta_ROA', 'accruals',
                 'delta_current_lev_ratio', 'delta_gross_margin', 'delta_asset_turnover']
@@ -49,10 +50,6 @@ def calc_pf_score(df, weighted=False):
 
     # Set first date as NA because there is no previous to calc delta on
     scores = scores.sum(axis=1)
-    old_date = df.date
-    df.date = pd.to_datetime(df.date)
-    scores.iloc[df.groupby('security_id').date.idxmin()] = 0
-    df.date = old_date
 
     return scores
 
@@ -84,7 +81,7 @@ class GetFscore:
     def calc_scores(self):
         df_measures = []
 
-        for id, df in self.data.groupby('security_id'):
+        for _, df in self.data.groupby('security_id'):
             df = df.sort_values('date', ascending=False)
 
             # Initialize clean dataframe to build on
@@ -145,11 +142,14 @@ class GetFscore:
         # Concat into df
         df_measures = pd.concat(df_measures, axis=0).fillna(np.nan)
 
-        calc_pf_score(df_measures, weighted=True)
-
         # Calculate PF Score
         df_measures['PF_score'] = calc_pf_score(df_measures, weighted=False)
         df_measures['PF_score_weighted'] = calc_pf_score(df_measures, weighted=True)
+
+        # old_date = df.date
+        # df.date = pd.to_datetime(df.date)
+        # scores.iloc[df.groupby('security_id').date.idxmin()] = 0
+        # df.date = old_date
 
         return df_measures
 
