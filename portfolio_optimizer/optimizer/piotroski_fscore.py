@@ -64,16 +64,18 @@ class GetFscore:
             # TODO filter on select security IDs to perform partial update
             pass
 
-        if models.Financials.objects.exists() and models.BalanceSheet.objects.exists():
+        # if models.Financials.objects.exists() and models.BalanceSheet.objects.exists():
+        if models.Fundamentals.objects.exists():
             self.year = date.today().year
             self.data = self.get_data()
             self.scores = self.calc_scores()
             self.save_scores()
 
     def get_data(self):
-        financials = pd.DataFrame(models.Financials.objects.all().values()).drop(columns='id')
-        balancesheet = pd.DataFrame(models.BalanceSheet.objects.all().values()).drop(columns='id')
-        data = balancesheet.merge(financials, on=['date', 'security_id'])
+        # financials = pd.DataFrame(models.Financials.objects.all().values()).drop(columns='id')
+        # balancesheet = pd.DataFrame(models.BalanceSheet.objects.all().values()).drop(columns='id')
+        # data = balancesheet.merge(financials, on=['date', 'security_id'])
+        data = pd.DataFrame(models.Fundamentals.objects.all().values()).drop(columns='id')
         float_cols = list(set(data.columns).difference(['security_id', 'date']))
         data[float_cols] = data[float_cols].astype(float)
 
@@ -90,20 +92,20 @@ class GetFscore:
 
             ### Profitability ###
             # ROA = Net Income / Total Assets | 1 if positive
-            measures['ROA'] = df['net_income'] / df['total_current_assets']
+            measures['ROA'] = df['net_income'] / df['current_assets']
             # Cash Flow | 1 if positive
             measures['delta_cash'] = calc_delta(df['cash'], as_percent=True)
             # Change in ROA | 1 if positive (greater than last year)
-            measures['delta_ROA'] = calc_delta(df['net_income'] / df['total_current_assets'])
+            measures['delta_ROA'] = calc_delta(df['net_income'] / df['current_assets'])
             # Accruals | Score 1 if CFROA > ROA
-            measures['accruals'] = df['cash'] / df['total_current_assets']
+            measures['accruals'] = df['cash'] / df['current_assets']
 
             ### Leverage, Liquidity and Source of Funds ###
             # Long term leverage ratio | 1 if negative (lower than last year)
-            measures['delta_long_lev_ratio'] = calc_delta(df['total_liab'] / df['total_assets'])
+            measures['delta_long_lev_ratio'] = calc_delta(df['total_liabilities'] / df['total_assets'])
             # Current leverage ratio | 1 point if positive (higher than last year)
             measures['delta_current_lev_ratio'] = calc_delta(
-                df['total_current_liabilities'] / df['total_current_assets']
+                df['current_liabilities'] / df['current_assets']
             )
             # Change in shares | 1 if no no shares (<=0)
             measures['delta_shares'] = calc_delta(df['shares_outstanding'], as_percent=True)
@@ -118,8 +120,8 @@ class GetFscore:
 
             ### Other metrics ###
             measures['cash'] = df['cash']
-            measures['cash_ratio'] = df['cash'] / df['total_current_liabilities']
-            measures['EPS'] = df['net_income_applicable_to_common_shares'] / df['shares_outstanding']
+            measures['cash_ratio'] = df['cash'] / df['current_liabilities']
+            measures['EPS'] = df['net_income_common_stockholders'] / df['shares_outstanding']
 
             # Get close price and PE
             prices = models.SecurityPrice.objects.filter(security_id__in=measures.security_id)

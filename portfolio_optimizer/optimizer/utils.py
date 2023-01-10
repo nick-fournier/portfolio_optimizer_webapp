@@ -22,7 +22,7 @@ def get_id_table(tickers, add_missing=False):
     return id_table
 
 
-def get_missing(proposed_tickers, DB=models.Financials):
+def get_missing(proposed_tickers, DB=models.Fundamentals):
 
     # First find ones that aren't in database at all
     existing = models.SecurityList.objects.filter(symbol__in=proposed_tickers)
@@ -47,9 +47,10 @@ def clean_records(DB_ref_dict=None):
     # DB Reference dic
     if DB_ref_dict is None:
         DB_ref_dict = {
-            'financials': models.Financials,
-            'balancesheet': models.BalanceSheet,
+            # 'financials': models.Financials,
+            # 'balancesheet': models.BalanceSheet,
             # 'dividends': models.Dividends,
+            'fundamentals': models.Fundamentals,
             'securityprice': models.SecurityPrice,
             'scores': models.Scores,
             'portfolio': models.Portfolio

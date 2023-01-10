@@ -28,7 +28,7 @@ def minmax(v):
 
 def get_analysis_data():
     scores = models.Scores.objects.all().values()
-    financials = models.Financials.objects.all().values('security_id', 'date')
+    financials = models.Fundamentals.objects.all().values('security_id', 'date')
 
     # Merged scores & price
     df = pd.DataFrame(scores).merge(pd.DataFrame(financials), on=['security_id', 'date'])
@@ -67,7 +67,8 @@ def forecast_expected_returns(company_df):
     # Normalize close price within group since that's company-level feature, all else are high level
     df_grps = df.groupby(grp_cols, group_keys=False)
     df['norm_lag_close'] = df_grps['lag_close'].apply(stats.zscore)
-    df[x_cols] = df[x_cols].apply(stats.zscore, axis=0).astype(float)
+    df[x_cols].apply(stats.zscore)
+
 
     # Store mean and std dev for later
     grp_stats = df_grps['lag_close'].agg(mean=np.mean, std=np.std)
@@ -130,6 +131,7 @@ def optimize():
     ], axis=1)
     df_allocation.index.name = 'security_id'
     df_allocation.reset_index(inplace=True)
+    df_allocation = df_allocation.fillna(0)
 
     # Send to database
     if not df_allocation.empty:

@@ -17,6 +17,8 @@ from portfolio_optimizer.optimizer import utils, download, piotroski_fscore, opt
 import datetime
 import pandas as pd
 import json
+import random
+import re
 
 
 # Create your views here.
@@ -62,12 +64,13 @@ class DashboardView(views.generic.ListView):
             df_scores = pd.DataFrame(scores)
             df_scores = df_scores.astype({x: float for x in decimal_fields if x in df_scores.columns})
             df_scores = df_scores.rename(columns={x: x.split('__')[-1] for x in related_fields})
+            df_scores = df_scores.sort_values(['allocation', 'symbol', 'date', 'PF_score'],
+                                              ascending=False).reset_index(drop=True)
 
             df_scores.allocation = round(100 * df_scores.allocation.astype(float), 2).astype(str) + "%"
             df_scores = df_scores.round({x: 3 for x in decimal_fields})
             df_scores.cash = '$' + (df_scores.cash / 1e6).astype(str) + 'm'
             df_scores['date'] = [x.strftime("%Y-%m-%d") for x in df_scores['date']]
-            df_scores = df_scores.sort_values(['symbol', 'date', 'PF_score'], ascending=False).reset_index(drop=True)
             df_scores.index += 1
 
             # parsing the DataFrame in json format.
@@ -91,12 +94,29 @@ class AddDataView(views.generic.FormView):
         if not models.DataSettings.objects.exists() or not self.request.user.is_authenticated:
             return HttpResponseRedirect(reverse_lazy('add-data'))
 
-        symbols = form.cleaned_data['symbols']
+        symbol_fieldval = form.cleaned_data['symbols']
 
         # If the all symbol * is given
-        if symbols == ['*']:
+        if symbol_fieldval == ['*']:
             symbols = self.snp_tickers
         else:
+            symbols = []
+            # Check for random arg
+            for symb in symbol_fieldval:
+                # If random, sample N and add to symbols list
+                if 'random' in symb:
+                    # Extract N
+                    n = re.findall(r'\d+', symb)
+                    n = int(n[0]) if isinstance(n, list) and len(n) > 0 else 10
+
+                    # Tickers to sample from, not already selected
+                    remaining = [x for x in self.snp_tickers if x not in symbols]
+
+                    # Sample and append to list
+                    symbols.extend(random.sample(remaining, n))
+                else:
+                    symbols.append(symb)
+
             # Check if symbol is valid SP500
             symbols = [x for x in symbols if x in self.snp_tickers]
 
@@ -126,6 +146,10 @@ class AddDataView(views.generic.FormView):
             # df_tickers.start_date.dt.strftime('%m/%d/%Y')
             snp_data = df_snp.merge(df_tickers, on='symbol', how='left')
         snp_data = snp_data.astype(object).where(snp_data.notna(), None)
+        if 'last_updated' not in snp_data.columns:
+            snp_data['last_updated'] = None
+
+        snp_data = snp_data.sort_values(['last_updated', 'symbol'])
 
         # Default data settings
         if not models.DataSettings.objects.exists():

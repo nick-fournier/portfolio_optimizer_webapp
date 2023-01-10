@@ -1,20 +1,20 @@
 
 from django.apps import apps
-from portfolio_optimizer.webframe import models
-from portfolio_optimizer.optimizer import piotroski_fscore
 from django.db.models import Q
-
-from portfolio_optimizer.optimizer import utils
+from portfolio_optimizer.webframe import models
+from portfolio_optimizer.optimizer import utils, optimization, piotroski_fscore
 import pandas as pd
 import yfinance as yf
 import datetime
-
+import os
 from progressbar import ProgressBar
 
 class DownloadCompanyData:
-    def __init__(self, tickers):
+    def __init__(self, tickers, cache=False):
         # Initialize empty dict
         self.data = {}
+        self.cached_data = {}
+        self.cache = cache
 
         # Parameters
         self.the_tickers = [tickers] if isinstance(tickers, str) else tickers
@@ -22,11 +22,13 @@ class DownloadCompanyData:
 
         self.start_date = models.DataSettings.objects.first().start_date
         self.end_date = datetime.date.today().strftime("%Y-%m-%d")
-        self.DB_ref = {'financials': models.Financials,
-                       'balancesheet': models.BalanceSheet,
-                       # 'dividends': models.Dividends,
-                       'securityprice': models.SecurityPrice
-                       }
+        self.DB_ref = {
+            'fundamentals': models.Fundamentals,
+            'securityprice': models.SecurityPrice
+            # 'financials': models.Financials,
+            # 'balancesheet': models.BalanceSheet,
+            # 'dividends': models.Dividends,
+            }
 
         # Cleanup any incomplete records before we do anything
         utils.clean_records()
@@ -52,43 +54,58 @@ class DownloadCompanyData:
                     # TODO save local backup data to csv?
                     self.set_data(db_name)
 
-
             piotroski_fscore.GetFscore()
+            optimization.optimize()
+
             print('Database update complete')
         else:
             print('No new tickers to update.')
 
 
-    def get_company_data(self, cache=True):
+    def get_company_data(self):
         print('Downloading stock data for:')
         for c in utils.chunked_iterable(self.the_tickers, 25):
             print(' '.join(c))
 
+        table_names = ['meta', 'fundamentals']
+        data_dict = {k: [] for k in table_names}
         stock_data = yf.Tickers(self.the_tickers)
         pbar = ProgressBar()
-        data_dict = {k: [] for k in ['meta', 'financials', 'balancesheet', 'dividends']}
+
+        if self.cache:
+            # read in cached data
+            self.cached_data = {k: pd.read_csv(os.path.join('cache', k + '.csv')) for k in table_names}
 
         for t in pbar(stock_data.symbols):
             s_id = int(self.id_table.loc[self.id_table['symbol'] == t].security_id.item())
-            df_dict = {}
+            ticker_data = {}
 
-            # TODO Check for local data first before scraping
+            # TODO Check for local data first before scraping?
             try:
                 obj = stock_data.tickers.get(t)
-                df_dict['meta'] = pd.DataFrame([obj.info])
-                df_dict['financials'] = obj.financials.T.reset_index().rename(columns={"": "date"})
-                df_dict['balancesheet'] = obj.balancesheet.T.reset_index().rename(columns={"": "date"})
-                # df_dict['financials'] = obj.quarterly_financials.T.reset_index().rename(columns={"": "date"})
-                # df_dict['balancesheet'] = obj.quarterly_balancesheet.T.reset_index().rename(columns={"": "date"})
-                # df_dict['dividends'] = obj.dividends.reset_index().dropna()
+                ticker_data['meta'] = pd.DataFrame([obj.info])
+                financials = obj.financials.T#.reset_index().rename(columns={"index": "date"})
+                balancesheet = obj.balancesheet.T#.reset_index().rename(columns={"index": "date"})
+
+                # One-off rename
+                balancesheet = balancesheet.rename(
+                    columns={
+                        'Total Liabilities Net Minority Interest': 'total_liabilities',
+                        'Cash Cash Equivalents And Short Term Investments': 'cash'
+                    })
+
+                # Merge into a single Fundamentals table
+                ticker_data['fundamentals'] = financials.join(balancesheet).reset_index()
+                ticker_data['fundamentals'] = ticker_data['fundamentals'].rename(columns={"index": "date"})
 
                 # Add shares outstanding to balance sheet
-                df_dict['balancesheet'].index = df_dict['balancesheet'].date.dt.year
-                df_dict['balancesheet'] = df_dict['balancesheet'].join(obj.shares).rename(
+                ticker_data['fundamentals'].index = ticker_data['fundamentals'].date.dt.year
+                ticker_data['fundamentals'] = ticker_data['fundamentals'].join(obj.shares).rename(
                     columns={'BasicShares': 'shares_outstanding'}
                 )
 
-                for df_name, df in df_dict.items():
+                # Append ticker data to overall downloaded data
+                for df_name, df in ticker_data.items():
                     # Add security id
                     df['security_id'] = s_id
                     # Add to df list to be concatenated
@@ -99,8 +116,9 @@ class DownloadCompanyData:
                 models.SecurityList.objects.filter(id=s_id).delete()
                 self.the_tickers = set(self.the_tickers).difference([t])
 
-        # Check if completely empty before proceeding
-        if not self.data:
+        # Check if any are completely empty before proceeding
+        if any([len(v) == 0 for k, v in data_dict.items()]):
+            print('One table download was empty!')
             return
 
         # Concatenate the final data
@@ -108,7 +126,7 @@ class DownloadCompanyData:
 
         # Attach quarterly prices to financials
         print("Downloading quarterly prices")
-        dates = self.data['financials'].date.dropna()
+        dates = self.data['fundamentals'].date.dropna()
         prices = yf.download(self.the_tickers,
                              start=datetime.datetime(dates.min().year, 1, 1).strftime("%Y-%m-%d"),
                              end=dates.max().strftime('%Y-%m-%d'),
@@ -120,16 +138,13 @@ class DownloadCompanyData:
             .rename(columns={'Date': 'quarter', 'last': 'quarterly_close', 'var': 'quarterly_variance'})\
             .merge(self.id_table, on='symbol').drop('symbol', axis=1)
 
-        self.data['financials'] = self.data['financials'].merge(
+        self.data['fundamentals'] = self.data['fundamentals'].merge(
             prices_quarterly,
-            left_on=[self.data['financials'].date.dt.quarter, 'security_id'],
+            left_on=[self.data['fundamentals'].date.dt.quarter, 'security_id'],
             right_on=['quarter', 'security_id']).drop('quarter', axis=1)
 
         self.get_price_data()
         self.set_meta()
-
-        if cache:
-            pass
 
 
     def get_price_data(self):
@@ -183,10 +198,6 @@ class DownloadCompanyData:
             meta = meta.merge(self.id_table.rename(columns={'security_id': 'pk'}), on='symbol')
 
             if not meta.empty:
-                # models.SecurityMeta.objects.bulk_create(
-                #     models.SecurityMeta(**vals) for vals in meta.to_dict('records')
-                # )
-
                 # create a list of user objects that need to be updated in bulk update
                 meta_bulk_update_list = []
                 meta_iter = zip(meta.pk, meta[meta_fields].to_dict(orient='records'))
@@ -212,9 +223,14 @@ class DownloadCompanyData:
         data.columns = [x.lower().replace(' ', '_') for x in data.columns]
         data = data.replace({pd.NaT: None})
 
+        # drop extra columns
+        _fields = [field.name for field in DB._meta.get_fields()]
+        _fields = list(set(data.columns).intersection(_fields)) + ['security_id']
+        data = data[_fields]
+
         # remove fields we don't have
-        if db_name == 'financials':
-            data = data.drop(columns=['quarterly_close', 'quarterly_variance'])
+        # if db_name == 'fundamentals':
+        #     data = data.drop(columns=['quarterly_close', 'quarterly_variance'])
 
         Qfilter = Q(security_id__in=data['security_id']) & Q(date__in=data['date'])
         old_data = pd.DataFrame(DB.objects.filter(Qfilter).values('security_id', 'date'))
@@ -230,6 +246,3 @@ class DownloadCompanyData:
             DB.objects.bulk_create(DB(**vals) for vals in new_data.to_dict('records'))
         else:
             print(db_name + ' already up to date')
-
-    def cache_data(self):
-        pass
