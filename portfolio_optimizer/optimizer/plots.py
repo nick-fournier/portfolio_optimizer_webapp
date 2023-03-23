@@ -1,6 +1,6 @@
 import pandas as pd
 
-from portfolio_optimizer.optimizer import optimization
+from ..optimizer import optimization
 from io import BytesIO
 import base64
 

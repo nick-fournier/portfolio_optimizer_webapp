@@ -8,7 +8,7 @@
 
 """
 
-from portfolio_optimizer.webframe import models
+from ..webframe import models
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
@@ -29,12 +29,32 @@ def minmax(v):
 def get_analysis_data():
     scores = models.Scores.objects.all().values()
     financials = models.Fundamentals.objects.all().values('security_id', 'date')
+    prices = models.SecurityPrice.objects.all().values('security_id', 'date', 'close')
 
-    # Merged scores & price
-    df = pd.DataFrame(scores).merge(pd.DataFrame(financials), on=['security_id', 'date'])
+    # As dataframe
+    scores = pd.DataFrame(scores)
+    financials = pd.DataFrame(financials)
+    prices = pd.DataFrame(prices)
+
+    # Aggregate price data annually
+    prices.close = prices.close.astype(float)
+    prices.date = pd.to_datetime(prices.date)
+
+    col_names = {'date': 'year', 'last': 'yearly_close', 'var': 'variance'}
+    prices_year = prices.groupby([prices.date.dt.year, 'security_id']).close\
+        .agg(['last', 'mean', 'var']).reset_index()\
+        .rename(columns=col_names)
+
+    # Merged scores & fundamentals
+    df = scores.merge(financials, on=['security_id', 'date'])
+
+    # Add year and merge prices
     df.date = pd.to_datetime(df.date)
-    df.yearly_close = df.yearly_close.astype(float)
-    df.PE_ratio = df.PE_ratio.astype(float)
+    df['year'] = df.date.dt.year
+    df = df.merge(prices_year, on=['security_id', 'year'])
+
+    # df.yearly_close = df.yearly_close.astype(float)
+    df.pe_ratio = df.pe_ratio.astype(float)
     df = df.sort_values(['security_id', 'date'])
 
     # Grouper
@@ -42,8 +62,8 @@ def get_analysis_data():
 
     # Some quick calcs
     df['order'] = grps.date.rank().astype(int)
-    df['pct_chg'] = grps['yearly_close'].apply(lambda x: x.pct_change(1))
-    df['cum_pct_chg'] = grps['yearly_close'].apply(pct_change_from_first)
+    # df['pct_chg'] = grps['yearly_close'].apply(lambda x: x.pct_change(1))
+    # df['cum_pct_chg'] = grps['yearly_close'].apply(pct_change_from_first)
 
     # df['norm_close'] = df.groupby('security_id', group_keys=False)['yearly_close'].apply(lambda x: minmax(x))
 
@@ -51,7 +71,7 @@ def get_analysis_data():
 
 def forecast_expected_returns(company_df):
 
-    x_cols = ['ROA', 'cash_ratio', 'delta_cash', 'delta_ROA', 'accruals', 'delta_long_lev_ratio',
+    x_cols = ['roa', 'cash_ratio', 'delta_cash', 'delta_roa', 'accruals', 'delta_long_lev_ratio',
               'delta_current_lev_ratio', 'delta_shares', 'delta_gross_margin', 'delta_asset_turnover']
     grp_cols = ['security_id']
 
@@ -93,7 +113,11 @@ def forecast_expected_returns(company_df):
     return expected_returns
 
 
-def optimize():
+def optimize(investment_amount=10000):
+
+    # Check type
+    investment_amount = float(investment_amount)
+
     # Forecast expected returns
     company_df = get_analysis_data()
     expected_returns = forecast_expected_returns(company_df)
@@ -105,6 +129,7 @@ def optimize():
     prices.close = prices.close.astype(float)
 
     # Get price data to wide
+    prices = prices.drop_duplicates()
     prices_wide = prices.pivot(index='date', columns='security_id', values='close').dropna()
 
     # Calculate covariance matrix
@@ -121,7 +146,7 @@ def optimize():
     latest_prices = prices.loc[prices.groupby('security_id').date.idxmax()].set_index('security_id')
     disc_allocation, cash = DiscreteAllocation(weights,
                                          latest_prices.close,
-                                         total_portfolio_value=10000,
+                                         total_portfolio_value=investment_amount,
                                          short_ratio=None).greedy_portfolio()
 
     # Format into dataframe
@@ -132,6 +157,10 @@ def optimize():
     df_allocation.index.name = 'security_id'
     df_allocation.reset_index(inplace=True)
     df_allocation = df_allocation.fillna(0)
+
+    # Reindex for all 0% stocks
+    all_security_ids = models.SecurityList.objects.all().values_list('pk', flat=True)
+    df_allocation = df_allocation.set_index('security_id').reindex(all_security_ids).fillna(0).reset_index()
 
     # Send to database
     if not df_allocation.empty:

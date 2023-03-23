@@ -1,9 +1,9 @@
-from portfolio_optimizer.webframe import models
+from ..webframe import models
 from django.db.models import Q
 
 import pandas as pd
 import numpy as np
-from datetime import date
+
 
 ### Profitability
 # ROA = Net Income / Total Assets
@@ -32,7 +32,7 @@ def calc_delta(series, as_percent = False):
 def calc_pf_score(df, weighted=False):
 
     # 1 point if positive
-    pos_cols = ['ROA', 'delta_cash', 'delta_ROA', 'accruals',
+    pos_cols = ['roa', 'delta_cash', 'delta_roa', 'accruals',
                 'delta_current_lev_ratio', 'delta_gross_margin', 'delta_asset_turnover']
 
     # 1 point if negative
@@ -55,23 +55,17 @@ def calc_pf_score(df, weighted=False):
 
 class GetFscore:
 
-    def __init__(self, recalc_db=False):
+    def __init__(self, fundamentals_df=None):
 
-        if recalc_db:
-            # TODO filter on select security IDs to perform partial update
-            pass
-
-        # if models.Financials.objects.exists() and models.BalanceSheet.objects.exists():
-        if models.Fundamentals.objects.exists():
-            self.year = date.today().year
+        if fundamentals_df is None and models.Fundamentals.objects.exists():
             self.data = self.get_data()
-            self.scores = self.calc_scores()
-            self.save_scores()
+        else:
+            self.data = fundamentals_df
+
+        self.scores = self.calc_scores()
+        # self.save_scores()
 
     def get_data(self):
-        # financials = pd.DataFrame(models.Financials.objects.all().values()).drop(columns='id')
-        # balancesheet = pd.DataFrame(models.BalanceSheet.objects.all().values()).drop(columns='id')
-        # data = balancesheet.merge(financials, on=['date', 'security_id'])
         data = pd.DataFrame(models.Fundamentals.objects.all().values()).drop(columns='id')
         float_cols = list(set(data.columns).difference(['security_id', 'date']))
         data[float_cols] = data[float_cols].astype(float)
@@ -89,11 +83,11 @@ class GetFscore:
 
             ### Profitability ###
             # ROA = Net Income / Total Assets | 1 if positive
-            measures['ROA'] = df['net_income'] / df['current_assets']
+            measures['roa'] = df['net_income'] / df['current_assets']
             # Cash Flow | 1 if positive
             measures['delta_cash'] = calc_delta(df['cash'], as_percent=True)
             # Change in ROA | 1 if positive (greater than last year)
-            measures['delta_ROA'] = calc_delta(df['net_income'] / df['current_assets'])
+            measures['delta_roa'] = calc_delta(df['net_income'] / df['current_assets'])
             # Accruals | Score 1 if CFROA > ROA
             measures['accruals'] = df['cash'] / df['current_assets']
 
@@ -118,23 +112,24 @@ class GetFscore:
             ### Other metrics ###
             measures['cash'] = df['cash']
             measures['cash_ratio'] = df['cash'] / df['current_liabilities']
-            measures['EPS'] = df['net_income_common_stockholders'] / df['shares_outstanding']
+            measures['eps'] = df['net_income_common_stockholders'] / df['shares_outstanding']
 
-            # Get close price and PE
-            prices = models.SecurityPrice.objects.filter(security_id__in=measures.security_id)
-            prices = pd.DataFrame(prices.values('date', 'security_id', 'close'))
-            prices = prices.rename(columns={'close': 'yearly_close'})
-            prices.yearly_close = prices.yearly_close.astype(float)
-
-            # Calc variance
-            prices.index = pd.to_datetime(prices.date).dt.year
-            var = prices.groupby(level=0).yearly_close.std()**2
-            var = var.reset_index().rename(columns={'yearly_close': 'yearly_variance'}).set_index('date')
-            prices = prices.join(var).reset_index(drop=True)
-            measures = measures.merge(prices, on=['security_id', 'date'], how='left')
-
-            # calc PE
-            measures['PE_ratio'] = measures['yearly_close'] / measures['EPS']
+            # TODO will need to update these after prices are downloaded for select stocks
+            # # Get close price and PE
+            # prices = models.SecurityPrice.objects.filter(security_id__in=measures.security_id)
+            # prices = pd.DataFrame(prices.values('date', 'security_id', 'close'))
+            # prices = prices.rename(columns={'close': 'yearly_close'})
+            # prices.yearly_close = prices.yearly_close.astype(float)
+            #
+            # # Calc variance
+            # prices.index = pd.to_datetime(prices.date).dt.year
+            # var = prices.groupby(level=0).yearly_close.std()**2
+            # var = var.reset_index().rename(columns={'yearly_close': 'yearly_variance'}).set_index('date')
+            # prices = prices.join(var).reset_index(drop=True)
+            # measures = measures.merge(prices, on=['security_id', 'date'], how='left')
+            #
+            # # calc PE
+            # measures['PE_ratio'] = measures['yearly_close'] / measures['EPS']
 
             # add to list
             df_measures.append(measures)
@@ -143,22 +138,25 @@ class GetFscore:
         df_measures = pd.concat(df_measures, axis=0).fillna(np.nan)
 
         # Calculate PF Score
-        df_measures['PF_score'] = calc_pf_score(df_measures, weighted=False)
-        df_measures['PF_score_weighted'] = calc_pf_score(df_measures, weighted=True)
+        df_measures['pf_score'] = calc_pf_score(df_measures, weighted=False)
+        df_measures['pf_score_weighted'] = calc_pf_score(df_measures, weighted=True)
 
         # old_date = df.date
         # df.date = pd.to_datetime(df.date)
         # scores.iloc[df.groupby('security_id').date.idxmin()] = 0
         # df.date = old_date
 
+        # Final cleanup
+        df_measures.replace([-np.inf, np.inf], np.nan, inplace=True)
+
         return df_measures
 
     def save_scores(self):
-        rnd_cols = list(set(self.scores.columns).difference(['security_id', 'date', 'PF_score', 'cash']))
+        rnd_cols = list(set(self.scores.columns).difference(['security_id', 'date', 'pf_score', 'cash']))
         new_scores = self.scores
         new_scores[rnd_cols] = new_scores[rnd_cols].astype(float).round(6)
         new_scores['cash'] = new_scores['cash']
-        new_scores['PF_score'] = new_scores['PF_score'].astype(int)
+        new_scores['pf_score'] = new_scores['pf_score'].astype(int)
         new_scores = new_scores.replace([np.NaN, np.inf, -np.inf], None)
 
         # Check for existing scores in DB

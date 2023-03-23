@@ -2,11 +2,11 @@ import datetime
 import os
 import json
 import pandas as pd
-import time
+from datetime import datetime, timedelta
 from urllib import request
 from itertools import islice
-from django.db.models import Q
-from portfolio_optimizer.webframe import models
+from django.db.models import Q, Max, Count
+from ..webframe import models
 
 
 THIS_PATH = os.path.dirname(__file__)
@@ -27,71 +27,126 @@ def get_id_table(tickers, add_missing=False):
     return id_table
 
 
-def get_missing(proposed_tickers, DB=models.Fundamentals):
+def get_missing(
+        proposed_tickers,
+        prices_days=30,
+        fundamentals_months=6
+        ):
+
+    # Elapsed time before updating data
+    p_elapse = datetime.now() - timedelta(days=prices_days)
+    f_elapse = datetime.now() - timedelta(days=fundamentals_months * 30)
 
     # First find ones that aren't in database at all
-    existing = models.SecurityList.objects.filter(symbol__in=proposed_tickers)
-    missing = set(proposed_tickers).difference(existing.values_list('symbol', flat=True))
+    existing = models.SecurityList.objects.filter(Q(symbol__in=proposed_tickers) & Q(sector__isnull=False))
+    missing = list(set(proposed_tickers).difference(existing.values_list('symbol', flat=True)))
+
+    # Find latest
+    latest_fundamentals = models.Fundamentals.objects.values('security_id').annotate(date=Max('date'))
+    latest_prices = models.SecurityPrice.objects.values('security_id').annotate(date=Max('date'))
 
     # Then find any that are out of date
-    start_date = models.DataSettings.objects.values_list('start_date').first()[0]
-    existing_todate = DB.objects.filter(Q(security_id__in=existing) & Q(date=start_date))
+    ood_meta = models.SecurityList.objects.filter(Q(symbol__in=existing) & Q(last_updated__lte=f_elapse))
+    ood_fundamentals = latest_fundamentals.filter(Q(security_id__in=existing) & Q(date__lte=f_elapse))
+    ood_prices = latest_prices.filter(Q(security_id__in=existing) & Q(date__lte=p_elapse))
 
-    # Get the corresponding symbol
-    existing_todate = models.SecurityList.objects.filter(id__in=existing_todate).values_list('symbol', flat=True)
+    # Combine into dictionary
+    ood_tickers = {
+        'meta': list(ood_meta.values_list('id', flat=True)),
+        'fundamentals': list(ood_fundamentals.values_list('security__symbol', flat=True)),
+        'securityprice': list(ood_prices.values_list('security__symbol', flat=True))
+    }
 
-    # Find the missing that aren't up to date
-    out_of_date = set(proposed_tickers).difference(existing_todate)
+    # Add missing to out of date tickers
+    ood_tickers = {k: v + missing for k, v in ood_tickers.items()}
 
-    # Add to the set of missing
-    missing.update(out_of_date)
+    # # Get the corresponding symbol
+    # existing_todate = models.SecurityList.objects.filter(id__in=existing_todate).values_list('symbol', flat=True)
+    #
+    # # Find the missing that aren't up to date
+    # out_of_date = set(proposed_tickers).difference(existing_todate)
+    #
+    # # Add to the set of missing
+    # missing.update(out_of_date)
 
-    return list(missing)
+    # return list(missing)
+    return ood_tickers
 
 def clean_records(DB_ref_dict=None):
-    # DB Reference dic
+
+    # DB Reference dict
     if DB_ref_dict is None:
         DB_ref_dict = {
-            # 'financials': models.Financials,
-            # 'balancesheet': models.BalanceSheet,
-            # 'dividends': models.Dividends,
             'fundamentals': models.Fundamentals,
             'securityprice': models.SecurityPrice,
-            'scores': models.Scores,
-            'portfolio': models.Portfolio
+            # 'scores': models.Scores,
+            # 'portfolio': models.Portfolio
         }
 
     security_ids = models.SecurityList.objects.values_list('id', flat=True)
 
+    # Finds any IDs that are not completely shared, fully mutually inclusive.
     incomplete_records = []
+    # Finds IDs the security list does have
+    has_records = {}
     for db_name, DB in DB_ref_dict.items():
         db_ids = DB.objects.values_list('security_id', flat=True)
+
+        # Find any missing
         incomplete_records.extend(set(security_ids).difference(db_ids))
         incomplete_records.extend(set(db_ids).difference(security_ids))
 
+        # Check for fundamentals and prices
+        has_records['has_' + db_name] = set(security_ids).intersection(db_ids)
+
+        # Remove duplicate rows if any
+        unique_fields = ['security_id', 'date']
+        duplicates = (
+            DB.objects.values(*unique_fields)
+            .order_by()
+            .annotate(max_id=Max('id'), count_id=Count('id'))
+            .filter(count_id__gt=1)
+        )
+
+        for duplicate in duplicates:
+            print('removing duplicate entries')
+            (
+                DB.objects
+                .filter(**{x: duplicate[x] for x in unique_fields})
+                .exclude(id=duplicate['max_id'])
+                .delete()
+            )
+
     incomplete_records = list(set(incomplete_records))
 
-    # Find incomplete records and remove
-    if incomplete_records:
-        records = models.SecurityList.objects.filter(id__in=incomplete_records)
-        records.delete()
+    # Update security list to indicate if it has fundamentals and/or prices
+    for field, has_ids in has_records.items():
+        SecurityList = models.SecurityList.objects.filter(id__in=has_ids)
+        SecurityList.update(**{field: True})
 
-        for db_name, DB in DB_ref_dict.items():
-            records = DB.objects.filter(security_id__in=incomplete_records)
-            if records.exists():
-                records.delete()
+    # # Find incomplete records and remove
+    # if incomplete_records:
+    #     records = models.SecurityList.objects.filter(id__in=incomplete_records)
+    #     print('Incomplete records: ' + ', '.join(records.values_list('symbol', flat=True)))
+    #     records.delete()
+    #     print('Removing from: ')
+    #     for db_name, DB in DB_ref_dict.items():
+    #         print(db_name)
+    #         records = DB.objects.filter(security_id__in=incomplete_records)
+    #         if records.exists():
+    #             records.delete()
 
 
 def get_latest_snp():
     json_path = os.path.join(THIS_PATH, '../fixtures/snp.json')
-    today = datetime.datetime.today().date()
-    timestamp = (datetime.datetime.today() - datetime.timedelta(days=1)).date()
+    today = datetime.today().date()
+    timestamp = (datetime.today() - timedelta(days=1)).date()
     # Default timestamp will always fetch data
 
     if os.path.exists(json_path):
         # Get age of file
         mtime = os.stat(json_path).st_mtime
-        timestamp = datetime.datetime.fromtimestamp(mtime).date()
+        timestamp = datetime.fromtimestamp(mtime).date()
 
     if timestamp < today:
         # Fetch S&P500 list

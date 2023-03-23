@@ -11,8 +11,8 @@ from django import views
 from django.shortcuts import render
 from rest_framework import viewsets
 
-from portfolio_optimizer.webframe import forms, models, serializers
-from portfolio_optimizer.optimizer import utils, download, piotroski_fscore, optimization, plots
+from ..webframe import models, serializers, forms
+from ..optimizer import utils, optimization, download
 
 import datetime
 import pandas as pd
@@ -27,15 +27,21 @@ def index(request):
 
 # uvicorn config.asgi:application --reload
 
-class DashboardView(views.generic.ListView):
+# class DashboardView(views.generic.ListView):
+class DashboardView(views.generic.FormView):
     model = models.Scores
     form_class = forms.OptimizeForm
     template_name = 'optimizer/dashboard.html'
     success_url = reverse_lazy('dashboard')
 
-    def post(self, request, *args, **kwargs):
-        piotroski_fscore.GetFscore()
-        optimization.optimize()
+    # def post(self, request, *args, **kwargs):
+    #     optimization.optimize()
+    #     return HttpResponseRedirect(reverse_lazy('dashboard'))
+
+    def form_valid(self, form):
+        investment_amount = form.cleaned_data['investment_amount']
+        optimization.optimize(investment_amount)
+
         return HttpResponseRedirect(reverse_lazy('dashboard'))
 
     def get_context_data(self, **kwargs):
@@ -44,8 +50,12 @@ class DashboardView(views.generic.ListView):
         context['plots'] = {}
 
         # Get scores + symbol
-        related_fields = ['security__symbol', 'security__longname',
-                          'security__portfolio__shares', 'security__portfolio__allocation']
+        related_fields = ['security__symbol',
+                          # 'security__longname',
+                          'security__business_summary',
+                          'security__portfolio__shares',
+                          'security__portfolio__allocation']
+
         scores_fields = [field.name for field in models.Scores._meta.get_fields()]
         scores_fields += related_fields
 
@@ -54,7 +64,7 @@ class DashboardView(views.generic.ListView):
         scores = scores.filter(date__in=scores.values('most_recent')).order_by('-date').values(*scores_fields)
 
         if scores.exists():
-            context['plots'] = plots.create_plots()
+            # context['plots'] = plots.create_plots()
 
             # Round decimals
             field_dat = models.Scores._meta.get_fields() + models.Portfolio._meta.get_fields()
@@ -64,7 +74,7 @@ class DashboardView(views.generic.ListView):
             df_scores = pd.DataFrame(scores)
             df_scores = df_scores.astype({x: float for x in decimal_fields if x in df_scores.columns})
             df_scores = df_scores.rename(columns={x: x.split('__')[-1] for x in related_fields})
-            df_scores = df_scores.sort_values(['allocation', 'symbol', 'date', 'PF_score'],
+            df_scores = df_scores.sort_values(['allocation', 'symbol', 'date', 'pf_score'],
                                               ascending=False).reset_index(drop=True)
 
             df_scores.allocation = round(100 * df_scores.allocation.astype(float), 2).astype(str) + "%"
@@ -88,7 +98,6 @@ class AddDataView(views.generic.FormView):
     success_url = reverse_lazy('add-data')
     snp_list = utils.get_latest_snp()
     snp_tickers = [x['Symbol'] for x in snp_list]
-
 
     def form_valid(self, form):
         if not models.DataSettings.objects.exists() or not self.request.user.is_authenticated:
@@ -122,7 +131,8 @@ class AddDataView(views.generic.FormView):
 
         # Get data
         # download.DownloadCompanyData(symbols)
-        for chunk in utils.chunked_iterable(symbols, 10):
+        for chunk in utils.chunked_iterable(symbols, 100):
+            print('Updating chunk ' + ', '.join(chunk))
             download.DownloadCompanyData(chunk)
 
         return HttpResponseRedirect(reverse_lazy('add-data'))

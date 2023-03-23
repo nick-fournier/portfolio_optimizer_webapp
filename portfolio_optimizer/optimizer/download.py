@@ -1,190 +1,183 @@
 
-from django.apps import apps
 from django.db.models import Q
-from portfolio_optimizer.webframe import models
-from portfolio_optimizer.optimizer import utils, optimization, piotroski_fscore
+from ..webframe import models
+from ..optimizer import utils, piotroski_fscore
 import pandas as pd
-import yfinance as yf
+import yahooquery as yq
 import datetime
-import os
-from progressbar import ProgressBar
+
 
 class DownloadCompanyData:
-    def __init__(self, tickers, cache=False):
+    def __init__(self, tickers, score_cutoff=7, save_to_db=True, cache=False):
         # Initialize empty dict
         self.data = {}
         self.cached_data = {}
         self.cache = cache
-
-        # Parameters
-        self.the_tickers = [tickers] if isinstance(tickers, str) else tickers
-        self.the_tickers = utils.get_missing(self.the_tickers)
-
-        self.start_date = models.DataSettings.objects.first().start_date
-        self.end_date = datetime.date.today().strftime("%Y-%m-%d")
-        self.DB_ref = {
-            'fundamentals': models.Fundamentals,
-            'securityprice': models.SecurityPrice
-            # 'financials': models.Financials,
-            # 'balancesheet': models.BalanceSheet,
-            # 'dividends': models.Dividends,
-            }
+        self.score_cutoff = score_cutoff
+        self.save_to_db = save_to_db
 
         # Cleanup any incomplete records before we do anything
         utils.clean_records()
-        self.download()
 
-    def download(self):
-        # get data
-        if self.the_tickers:
-            # Generate ID for new security if missing
-            self.id_table = utils.get_id_table(self.the_tickers, add_missing=True)
+        # Parameters, get out of date data
+        the_tickers = [tickers] if isinstance(tickers, str) else tickers
+        ood_tickers = utils.get_missing(the_tickers)
 
-            # Fetch the company data (balance sheet, financials, etc.)
-            self.get_company_data()
+        self.end_date = datetime.date.today().strftime("%Y-%m-%d")
+        self.DB_ref = {
+            'fundamentals': models.Fundamentals,
+            'securityprice': models.SecurityPrice,
+            'scores': models.Scores,
+            'portfolio': models.Portfolio
+            }
 
-            # Ensure meta set correctly, rerun clean if not
-            incomplete = models.SecurityList.objects.filter(sector__isnull=True)
-            if incomplete:
-                incomplete.delete()
-                utils.clean_records(self.DB_ref)
+        # Download
+        self.download(ood_tickers)
 
-            if self.data:
-                for db_name in self.DB_ref.keys():
-                    # TODO save local backup data to csv?
-                    self.set_data(db_name)
+        # if self.the_tickers:
+        #     self.download()
+        # else:
+        #     print('No new tickers to update.')
 
-            piotroski_fscore.GetFscore()
-            optimization.optimize()
+    def download(self, ood_tickers):
+        # Generate ID for new security if missing
+        all_tickers = [item for sublist in ood_tickers.values() for item in sublist]
+        self.id_table = utils.get_id_table(all_tickers, add_missing=True)
 
-            print('Database update complete')
-        else:
-            print('No new tickers to update.')
+        # 1) Fetch company meta data
+        if ood_tickers['meta']:
+            meta = self.get_meta(ood_tickers['meta'])
+            self.set_meta(meta)
 
+        if ood_tickers['fundamentals']:
+            # 2) First fetch all company stock fundamental data
+            fundamentals = self.get_fundamentals(ood_tickers['fundamentals'])
+            self.set_data(db_name='fundamentals', data=fundamentals)
 
-    def get_company_data(self):
-        print('Downloading stock data for:')
-        for c in utils.chunked_iterable(self.the_tickers, 25):
-            print(' '.join(c))
+            # 3) Then calculate PF score
+            PFScores = piotroski_fscore.GetFscore(fundamentals)
+            scores = PFScores.scores.reset_index()
+            self.set_data(db_name='scores', data=scores)
 
-        table_names = ['meta', 'fundamentals']
-        data_dict = {k: [] for k in table_names}
-        stock_data = yf.Tickers(self.the_tickers)
-        pbar = ProgressBar()
+            # 4) Filter out stock picks by score threshold. Keep any that ever exceed it (for backtesting)
+            max_ticker_scores = (PFScores.scores.pf_score > self.score_cutoff).groupby('symbol').any()
+            price_tickers = max_ticker_scores[max_ticker_scores >= self.score_cutoff].index
+            # Add out of date prices to update, remove duplicates
+            ood_tickers['securityprice'].extend(price_tickers)
+            ood_tickers['securityprice'] = set(ood_tickers['securityprice'])
 
-        if self.cache:
-            # read in cached data
-            self.cached_data = {k: pd.read_csv(os.path.join('cache', k + '.csv')) for k in table_names}
+        if ood_tickers['securityprice']:
+            # 5) Get price data only for tickers above score threshold or out of date
+            securityprice = self.get_prices(ood_tickers['securityprice'])
+            self.set_data(db_name='securityprice', data=securityprice)
 
-        for t in pbar(stock_data.symbols):
-            s_id = int(self.id_table.loc[self.id_table['symbol'] == t].security_id.item())
-            ticker_data = {}
+        # 6) Ensure meta set correctly, rerun clean if not
+        # incomplete = models.SecurityList.objects.filter(sector__isnull=True)
+        # if incomplete:
+        #     # incomplete.delete()
+        utils.clean_records()
 
-            # TODO Check for local data first before scraping?
-            try:
-                obj = stock_data.tickers.get(t)
-                ticker_data['meta'] = pd.DataFrame([obj.info])
-                financials = obj.financials.T#.reset_index().rename(columns={"index": "date"})
-                balancesheet = obj.balancesheet.T#.reset_index().rename(columns={"index": "date"})
+        # 7) ?
+        # optimization.optimize()
 
-                # One-off rename
-                balancesheet = balancesheet.rename(
-                    columns={
-                        'Total Liabilities Net Minority Interest': 'total_liabilities',
-                        'Cash Cash Equivalents And Short Term Investments': 'cash'
-                    })
+        # self.data = {
+        #     'meta': meta,
+        #     'fundamentals': fundamentals,
+        #     'securityprice': securityprice,
+        # }
 
-                # Merge into a single Fundamentals table
-                ticker_data['fundamentals'] = financials.join(balancesheet).reset_index()
-                ticker_data['fundamentals'] = ticker_data['fundamentals'].rename(columns={"index": "date"})
+        print('Database update complete')
 
-                # Add shares outstanding to balance sheet
-                ticker_data['fundamentals'].index = ticker_data['fundamentals'].date.dt.year
-                ticker_data['fundamentals'] = ticker_data['fundamentals'].join(obj.shares).rename(
-                    columns={'BasicShares': 'shares_outstanding'}
-                )
+    def get_meta(self, the_tickers):
+        print('Downloading stock meta data')
 
-                # Append ticker data to overall downloaded data
-                for df_name, df in ticker_data.items():
-                    # Add security id
-                    df['security_id'] = s_id
-                    # Add to df list to be concatenated
-                    data_dict[df_name].append(df)
+        fields_map = {
+            'index': 'symbol',
+            'country': 'country',
+            'sector': 'sector',
+            'industry': 'industry',
+            'website': 'logo_url',
+            'fullTimeEmployees': 'fulltime_employees',
+            'longBusinessSummary': 'business_summary'
+        }
 
-            except:
-                print("Couldn't get " + t + ', removing from list.')
-                models.SecurityList.objects.filter(id=s_id).delete()
-                self.the_tickers = set(self.the_tickers).difference([t])
+        stock_data = yq.Ticker(the_tickers)
+        meta = stock_data.asset_profile
 
-        # Check if any are completely empty before proceeding
-        if any([len(v) == 0 for k, v in data_dict.items()]):
-            print('One table download was empty!')
+        # Remove empty result
+        meta = {k: v for k, v in meta.items() if type(v) == dict}
+
+        meta = pd.DataFrame(meta).T.reset_index()
+        meta = meta.rename(columns=fields_map)
+
+        # self.set_meta(meta)
+
+        return meta
+
+    def get_fundamentals(self, the_tickers):
+        print('Downloading stock fundamentals data')
+
+        # database to scrape map
+        fields_map = {
+            'NetIncome': 'net_income',
+            'NetIncomeCommonStockholders': 'net_income_common_stockholders',
+            'TotalLiabilitiesNetMinorityInterest': 'total_liabilities',
+            'TotalAssets': 'total_assets',
+            'CurrentAssets': 'current_assets',
+            'CurrentLiabilities': 'current_liabilities',
+            'CapitalStock': 'shares_outstanding',
+            'CashAndCashEquivalents': 'cash',
+            'GrossProfit': 'gross_profit',
+            'TotalRevenue': 'total_revenue',
+         }
+
+        stock_data = yq.Ticker(the_tickers)
+        fundamentals = stock_data.get_financial_data(
+            types=list(fields_map.keys()),
+            frequency='a',
+            trailing=False
+        )
+
+        # Cleanup and add security id
+        fundamentals.rename(columns={**{'asOfDate': 'date'}, **fields_map}, inplace=True)
+        fundamentals.drop(columns=['periodType', 'currencyCode'], inplace=True)
+        fundamentals = fundamentals.join(self.id_table.set_index('symbol'))
+
+        # Add empty fields if missing
+        for f in fields_map.values():
+            if f not in fundamentals.columns:
+                fundamentals[f] = None
+
+        return fundamentals
+
+    def get_prices(self, price_tickers=None, period='5y', interval='1mo'):
+
+        if price_tickers is None:
             return
-
-        # Concatenate the final data
-        self.data = {k: pd.concat(v, axis=0) for k, v in data_dict.items()}
-
-        # Attach quarterly prices to financials
-        print("Downloading quarterly prices")
-        dates = self.data['fundamentals'].date.dropna()
-        prices = yf.download(self.the_tickers,
-                             start=datetime.datetime(dates.min().year, 1, 1).strftime("%Y-%m-%d"),
-                             end=dates.max().strftime('%Y-%m-%d'),
-                             group_by='ticker')
-
-        prices = utils.flatten_prices(prices, self.the_tickers)
-        prices_quarterly = prices.groupby([prices.Date.dt.quarter, 'symbol']).Close\
-            .agg(['last', 'var']).reset_index()\
-            .rename(columns={'Date': 'quarter', 'last': 'quarterly_close', 'var': 'quarterly_variance'})\
-            .merge(self.id_table, on='symbol').drop('symbol', axis=1)
-
-        self.data['fundamentals'] = self.data['fundamentals'].merge(
-            prices_quarterly,
-            left_on=[self.data['fundamentals'].date.dt.quarter, 'security_id'],
-            right_on=['quarter', 'security_id']).drop('quarter', axis=1)
-
-        self.get_price_data()
-        self.set_meta()
-
-
-    def get_price_data(self):
-        print('Downloading stock data for:')
-        for c in utils.chunked_iterable(self.the_tickers, 25):
-            print(' '.join(c))
 
         # Get price data if requested
         print('Downloading price data...')
-        price_data = yf.download(self.the_tickers,
-                                 group_by='ticker',
-                                 start=self.start_date,
-                                 end=self.end_date)
-
-        # Flatten out so that symbol is column
-        price_data = utils.flatten_prices(price_data, self.the_tickers)
+        stock_data = yq.Ticker(price_tickers)
+        price_data = stock_data.history(period=period, interval=interval)
 
         # Convert symbol to security id
-        price_data.columns = price_data.columns.str.lower()
-        price_data = self.id_table.merge(price_data, on='symbol').drop(columns='symbol')
+        price_data = price_data.join(self.id_table.set_index('symbol')).reset_index()
 
-        self.data['securityprice'] = price_data
+        return price_data
 
-    def set_meta(self):
+    def set_meta(self, meta):
+        # Compare current meta data to see if any are incomplete entries (i.e., new)
         incomplete_ids = [k for k, v in models.SecurityList.objects.values_list('symbol', 'sector') if v is None]
-        incomplete_ids = list(set(self.the_tickers).intersection(incomplete_ids))
+        incomplete_ids = list(set(meta.symbol).intersection(incomplete_ids))
+        # incomplete_ids = list(set(self.the_tickers).intersection(incomplete_ids))
 
         if incomplete_ids:
-            print('Updating meta data...')
-            # Get field names from model, remove related model names
-            exclude = list(apps.all_models['webframe'].keys()) + ['id', 'security', 'last_updated', 'first_created']
-            meta_fields = [field.name for field in models.SecurityList._meta.get_fields()]
-            meta_fields = [x for x in meta_fields if x not in exclude]
-            renames = {'longbusinesssummary': 'business_summary',
-                       'fulltimeemployees': 'fulltime_employees'}
+            # Get "concrete" fields (not relation field)
+            meta_fields = [f.name for f in models.SecurityList._meta.get_fields() if f.concrete]
 
-            # Get NEW meta data into data frame
-            meta = self.data['meta']
-            meta.columns = [x.lower().replace(' ', '_') for x in meta.columns]
-            meta.columns = [renames[x] if x in renames.keys() else x for x in meta.columns]
+            # Exclude other specific fields
+            exclude = ['id', 'security', 'last_updated', 'first_created', 'has_fundamentals', 'has_securityprice']
+            meta_fields = [x for x in meta_fields if x not in exclude]
 
             # Add Null to any missing
             missing = list(set(meta_fields).difference(meta.columns))
@@ -203,23 +196,25 @@ class DownloadCompanyData:
                 meta_iter = zip(meta.pk, meta[meta_fields].to_dict(orient='records'))
 
                 for key, values_dict in meta_iter:
-                    meta = models.SecurityList.objects.get(id=key)
+                    _meta = models.SecurityList.objects.get(id=key)
 
                     for field, value in values_dict.items():
-                        setattr(meta, field, value)
+                        setattr(_meta, field, value)
 
-                    meta_bulk_update_list.append(meta)
+                    meta_bulk_update_list.append(_meta)
 
                 # Bulk update
                 models.SecurityList.objects.bulk_update(meta_bulk_update_list, meta_fields)
 
-
         else:
             print('Meta data already up to date')
 
-    def set_data(self, db_name):
+    def set_data(self, db_name, data):
+
+        if data.empty:
+            return
+
         DB = self.DB_ref[db_name]
-        data = self.data[db_name]
         data.columns = [x.lower().replace(' ', '_') for x in data.columns]
         data = data.replace({pd.NaT: None})
 
@@ -228,16 +223,18 @@ class DownloadCompanyData:
         _fields = list(set(data.columns).intersection(_fields)) + ['security_id']
         data = data[_fields]
 
-        # remove fields we don't have
-        # if db_name == 'fundamentals':
-        #     data = data.drop(columns=['quarterly_close', 'quarterly_variance'])
-
+        # Filter for any existing data
         Qfilter = Q(security_id__in=data['security_id']) & Q(date__in=data['date'])
         old_data = pd.DataFrame(DB.objects.filter(Qfilter).values('security_id', 'date'))
-        if old_data.empty:
-            old_data = pd.DataFrame(columns=['security_id', 'date'])
 
-        new_data = data[~(data.date.isin(old_data.date) & data.security_id.isin(old_data.security_id))]
+        # If old data exists, remove existing entries
+        if old_data.empty:
+            new_data = data
+        else:
+            new_data = data[
+                ~(data.date.isin(old_data.date) &
+                  data.security_id.isin(old_data.security_id))
+            ]
 
         # Fix NaNs
         new_data = new_data.astype(object).where(new_data.notna(), None)

@@ -3,7 +3,7 @@ from django.core import validators
 from django.forms import ModelForm
 from django.forms.widgets import DateInput
 
-from portfolio_optimizer.webframe import models
+from ..webframe import models
 
 from django.db.utils import OperationalError
 import datetime
@@ -41,7 +41,7 @@ class CommaSeparatedCharField(forms.Field):
         return value
 
 class OptimizeForm(forms.Form):
-    pass
+    investment_amount = forms.DecimalField(initial=10000)
 
 class MultipleForm(forms.Form):
     action = forms.CharField(max_length=60, widget=forms.HiddenInput())

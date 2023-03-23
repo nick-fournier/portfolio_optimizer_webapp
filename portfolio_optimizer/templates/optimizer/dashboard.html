@@ -4,15 +4,23 @@
 <div style="width:50%;height:50%">{{ plots.pct_date|safe }}</div>
 
 <h4>Piotroski F-Scores</h4><br>
+
 <form action="" method="post">
     {% csrf_token %}
-    {{ forms.optimize }}
-    <div id="progress-wrapper">
-        <input type="submit" value="Update scores", id="progress-bar-trigger">
-        <div id="progress-bar" style="background-color: blue; width: 0%;">&nbsp;</div>
-        <div id="progress-bar-message"> </div>
-    </div>
+    {{ form }}
+    <input type="submit" value="Optimize portfolio">
 </form>
+
+{#<form action="" method="post">#}
+{#    {% csrf_token %}#}
+{#    {{ forms.optimize }}#}
+{#    <div id="progress-wrapper">#}
+{#        <input type="submit" value="Update scores", id="progress-bar-trigger">#}
+{#        <div id="progress-bar" style="background-color: blue; width: 0%;">&nbsp;</div>#}
+{#        <div id="progress-bar-message"> </div>#}
+{#    </div>#}
+{#</form>#}
+
 <table class="table table-sm", style="width:100%">
     <thead class="thead-dark">
     <tr>
@@ -52,14 +60,14 @@
         <td>{{i.allocation}}</td>
         <td>{{i.shares}}</td>
         <!--Metrics-->
-        <td>{{i.PF_score}}</td>
-        <td>{{i.PF_score_weighted}}</td>
-        <td>{{i.EPS}}</td>
-        <td>{{i.PE_ratio}}</td>
+        <td>{{i.pf_score}}</td>
+        <td>{{i.pf_score_weighted}}</td>
+        <td>{{i.eps}}</td>
+        <td>{{i.pe_ratio}}</td>
         <!--Profitability-->
-        <td>{{i.ROA}}</td>
+        <td>{{i.roa}}</td>
         <td>{{i.delta_cash}}</td>
-        <td>{{i.delta_ROA}}</td>
+        <td>{{i.delta_roa}}</td>
         <td>{{i.accruals}}</td>
         <!--Leverage, Liquidity and Source of Funds-->
         <td>{{i.delta_long_lev_ratio}}</td>
