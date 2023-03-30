@@ -29,30 +29,6 @@ def calc_delta(series, as_percent = False):
 
     return delta
 
-def calc_pf_score(df, weighted=False):
-
-    # 1 point if positive
-    pos_cols = ['roa', 'delta_cash', 'delta_roa', 'accruals',
-                'delta_current_lev_ratio', 'delta_gross_margin', 'delta_asset_turnover']
-
-    # 1 point if negative
-    neg_cols = ['delta_long_lev_ratio']
-
-    # 1 point if less than or equal to 0
-    leq_cols = ['delta_shares']
-
-    # Sum up the score
-    scores = pd.concat([df[pos_cols] > 0, df[neg_cols] < 0, df[leq_cols] <= 0], axis=1).astype(int)
-
-    if weighted:
-        weights = df[pos_cols + neg_cols + leq_cols].abs() + 1
-        scores = scores * weights
-
-    # Set first date as NA because there is no previous to calc delta on
-    scores = scores.sum(axis=1)
-
-    return scores
-
 class GetFscore:
 
     def __init__(self, fundamentals_df=None):
@@ -71,6 +47,30 @@ class GetFscore:
         data[float_cols] = data[float_cols].astype(float)
 
         return data
+
+    def calc_pf_score(df, weighted=False):
+
+        # 1 point if positive
+        pos_cols = ['roa', 'delta_cash', 'delta_roa', 'accruals',
+                    'delta_current_lev_ratio', 'delta_gross_margin', 'delta_asset_turnover']
+
+        # 1 point if negative
+        neg_cols = ['delta_long_lev_ratio']
+
+        # 1 point if less than or equal to 0
+        leq_cols = ['delta_shares']
+
+        # Sum up the score
+        scores = pd.concat([df[pos_cols] > 0, df[neg_cols] < 0, df[leq_cols] <= 0], axis=1).astype(int)
+
+        if weighted:
+            weights = df[pos_cols + neg_cols + leq_cols].abs() + 1
+            scores = scores * weights
+
+        # Set first date as NA because there is no previous to calc delta on
+        scores = scores.sum(axis=1)
+
+        return scores
 
     def calc_scores(self):
         df_measures = []
@@ -138,8 +138,8 @@ class GetFscore:
         df_measures = pd.concat(df_measures, axis=0).fillna(np.nan)
 
         # Calculate PF Score
-        df_measures['pf_score'] = calc_pf_score(df_measures, weighted=False)
-        df_measures['pf_score_weighted'] = calc_pf_score(df_measures, weighted=True)
+        df_measures['pf_score'] = self.calc_pf_score(df_measures, weighted=False)
+        df_measures['pf_score_weighted'] = self.calc_pf_score(df_measures, weighted=True)
 
         # old_date = df.date
         # df.date = pd.to_datetime(df.date)
