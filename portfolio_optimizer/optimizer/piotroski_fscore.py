@@ -48,7 +48,7 @@ class GetFscore:
 
         return data
 
-    def calc_pf_score(df, weighted=False):
+    def calc_pf_score(self, df, weighted=False):
 
         # 1 point if positive
         pos_cols = ['roa', 'delta_cash', 'delta_roa', 'accruals',
