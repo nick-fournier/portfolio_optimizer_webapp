@@ -34,6 +34,7 @@ class Portfolio(models.Model):
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
     allocation = models.DecimalField(max_digits=10, null=True, decimal_places=6)
     shares = models.IntegerField(default=None, null=True)
+    year = models.IntegerField(default=None, null=True)
 
 class Scores(models.Model):
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)

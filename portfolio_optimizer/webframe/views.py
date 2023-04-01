@@ -40,7 +40,8 @@ class DashboardView(views.generic.FormView):
 
     def form_valid(self, form):
         investment_amount = form.cleaned_data['investment_amount']
-        optimization.optimize(investment_amount)
+        optimalPortfolio = optimization.OptimizePorfolio(investment_amount)
+        optimalPortfolio.save_portfolio()
 
         return HttpResponseRedirect(reverse_lazy('dashboard'))
 
