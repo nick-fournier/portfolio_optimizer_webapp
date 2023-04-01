@@ -8,7 +8,7 @@ import datetime
 
 
 class DownloadCompanyData:
-    def __init__(self, tickers, score_cutoff=7, save_to_db=True, cache=False):
+    def __init__(self, tickers=None, score_cutoff=7, save_to_db=True, cache=False):
         # Initialize empty dict
         self.data = {}
         self.cached_data = {}

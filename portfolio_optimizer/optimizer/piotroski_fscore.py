@@ -1,5 +1,6 @@
 from ..webframe import models
 from django.db.models import Q
+from datetime import datetime
 
 import pandas as pd
 import numpy as np
@@ -22,7 +23,7 @@ import numpy as np
 # EPS = (Net Income - Preferred Dividends) / Common Stock
 # P/E = Price / EPS
 
-def calc_delta(series, as_percent = False):
+def calc_delta(series, as_percent=False):
     delta = series - series.shift(-1)
     if as_percent:
         delta /= series.shift(-1)
@@ -141,12 +142,20 @@ class GetFscore:
         df_measures['pf_score'] = self.calc_pf_score(df_measures, weighted=False)
         df_measures['pf_score_weighted'] = self.calc_pf_score(df_measures, weighted=True)
 
-        # old_date = df.date
-        # df.date = pd.to_datetime(df.date)
-        # scores.iloc[df.groupby('security_id').date.idxmin()] = 0
-        # df.date = old_date
+        # Add fiscal year
+        df_measures['dtdate'] = pd.to_datetime(df_measures.date)
+        fy_dates = [f"{x}-12-31" for x in range(df_measures.dtdate.dt.year.min()-1, datetime.today().year)]
+        fy_dates = pd.to_datetime(fy_dates).to_frame(name='fiscal_year')
+        fy_dates.fiscal_year = fy_dates.fiscal_year.dt.year
+
+        # Match to nearest FY
+        df_measures = pd.merge_asof(df_measures.sort_values('dtdate'),
+                                    fy_dates,
+                                    left_on='dtdate', right_index=True,
+                                    direction='nearest')
 
         # Final cleanup
+        df_measures.drop(columns='dtdate', inplace=True)
         df_measures.replace([-np.inf, np.inf], np.nan, inplace=True)
 
         return df_measures

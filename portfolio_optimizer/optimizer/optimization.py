@@ -9,6 +9,7 @@
 """
 
 from ..webframe import models
+from . import piotroski_fscore
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
@@ -27,14 +28,18 @@ def minmax(v):
     return (v - v.min()) / (v.max() - v.min())
 
 def get_analysis_data():
-    scores = models.Scores.objects.all().values()
     financials = models.Fundamentals.objects.all().values('security_id', 'date')
     prices = models.SecurityPrice.objects.all().values('security_id', 'date', 'close')
+    scores = models.Scores.objects.all().values()
 
     # As dataframe
-    scores = pd.DataFrame(scores)
     financials = pd.DataFrame(financials)
     prices = pd.DataFrame(prices)
+    scores = pd.DataFrame(scores)
+
+    # update scores
+    # pfobject = piotroski_fscore.GetFscore()
+    # pfobject.save_scores()
 
     # Aggregate price data annually
     prices.close = prices.close.astype(float)
@@ -50,7 +55,7 @@ def get_analysis_data():
 
     # Add year and merge prices
     df.date = pd.to_datetime(df.date)
-    df['year'] = df.date.dt.year
+    df.rename(columns={'fiscal_year': 'year'}, inplace=True)
     df = df.merge(prices_year, on=['security_id', 'year'])
 
     # df.yearly_close = df.yearly_close.astype(float)
@@ -61,10 +66,9 @@ def get_analysis_data():
     grps = df.groupby('security_id', group_keys=False)
 
     # Some quick calcs
-    df['order'] = grps.date.rank().astype(int)
+    df['order'] = grps.date.rank(ascending=True).astype(int)
     # df['pct_chg'] = grps['yearly_close'].apply(lambda x: x.pct_change(1))
     # df['cum_pct_chg'] = grps['yearly_close'].apply(pct_change_from_first)
-
     # df['norm_close'] = df.groupby('security_id', group_keys=False)['yearly_close'].apply(lambda x: minmax(x))
 
     return df
@@ -73,45 +77,54 @@ def forecast_expected_returns(company_df):
 
     x_cols = ['roa', 'cash_ratio', 'delta_cash', 'delta_roa', 'accruals', 'delta_long_lev_ratio',
               'delta_current_lev_ratio', 'delta_shares', 'delta_gross_margin', 'delta_asset_turnover']
-    grp_cols = ['security_id']
 
     company_df.date = pd.to_datetime(company_df.date)
-    df = company_df.set_index(['date', 'security_id'])
-    df = df[x_cols + ['yearly_close']].fillna(0)
+    # company_df['year'] = company_df.date.dt.year
+    model_df = company_df.set_index(['year', 'security_id'])
+    model_df = model_df[x_cols + ['yearly_close', 'order']].fillna(0)
 
     # Get lagged value of features from t-1
-    df['lag_close'] = df.groupby(grp_cols, group_keys=False)['yearly_close'].shift(-1)
-    df_t0 = df[df.lag_close.isnull()]
-    df = df[~df.lag_close.isnull()]
+    model_df['lag_close'] = model_df.groupby('security_id', group_keys=False)['yearly_close'].shift(-1)
 
     # Normalize close price within group since that's company-level feature, all else are high level
-    df_grps = df.groupby(grp_cols, group_keys=False)
-    df['norm_lag_close'] = df_grps['lag_close'].apply(stats.zscore)
-    df[x_cols].apply(stats.zscore)
-
+    df_grps = model_df[~model_df.lag_close.isnull()].groupby('security_id', group_keys=False)
+    model_df.loc[~model_df.lag_close.isnull(), 'norm_lag_close'] = df_grps['lag_close'].apply(stats.zscore)
+    # df_t[x_cols].apply(stats.zscore)
 
     # Store mean and std dev for later
     grp_stats = df_grps['lag_close'].agg(mean=np.mean, std=np.std)
 
-    # Assemble matrices
-    y = df['norm_lag_close'].to_numpy()
-    X = df[x_cols].to_numpy()
+    # Initalize DF to join to
+    for i in range(model_df.order.min() + 1, model_df.order.max()):
 
-    # Estimate model
-    model = LinearRegression().fit(X, y)
-    print(f'R^2 = {model.score(X, y)}')
-    print(pd.Series(list(model.coef_), index=x_cols))
+        # Model matrix for time<i
+        df_t = model_df[model_df.order < i]
+        # Drop any missing years
+        df_t = df_t[~df_t.lag_close.isna()]
+        # Prediction matrix for time i
+        df_t0 = model_df[model_df.order == i]
 
-    # Make predictions
-    yhat = pd.DataFrame(model.predict(df_t0[x_cols]), index=df_t0.index, columns=['yhat']).join(grp_stats)
-    yhat['next_close'] = yhat.apply(lambda row: rescore(row['yhat'], row['mean'], row['std']), axis=1)
+        # Assemble matrices
+        y = df_t['norm_lag_close'].to_numpy()
+        x = df_t[x_cols].astype(float).to_numpy()
 
-    # Calculate returns
-    expected_returns = df_t0.join(yhat).apply(lambda x: (x.next_close - x.yearly_close)/x.yearly_close, axis=1)
+        # Estimate model
+        model = LinearRegression().fit(x, y)
+        print(f'R^2 = {model.score(x, y)}')
+        print(pd.Series(list(model.coef_), index=x_cols))
+
+        # Make predictions
+        yhat = pd.DataFrame(model.predict(df_t0[x_cols]), index=df_t0.index, columns=['yhat']).join(grp_stats)
+        yhat['next_close'] = yhat.apply(lambda row: rescore(row['yhat'], row['mean'], row['std']), axis=1)
+
+        # Calculate returns
+        model_df.loc[yhat.index, yhat.columns] = yhat
+
+    # Expected returns as percent change
+    expected_returns = model_df.apply(lambda x: (x.next_close - x.yearly_close)/x.yearly_close, axis=1)
     expected_returns.name = 'expected_returns'
 
     return expected_returns
-
 
 def optimize(investment_amount=10000):
 
@@ -120,38 +133,49 @@ def optimize(investment_amount=10000):
 
     # Forecast expected returns
     company_df = get_analysis_data()
-    expected_returns = forecast_expected_returns(company_df)
+    returns_df = forecast_expected_returns(company_df).reset_index()
+    returns_df = returns_df[~returns_df.expected_returns.isna()]
 
     # Some formatting
     prices = models.SecurityPrice.objects.filter(security_id__in=company_df.security_id)
     prices = pd.DataFrame(prices.values('security_id', 'date', 'close'))
     prices.date = pd.to_datetime(prices.date)
+    prices['year'] = prices.date.dt.year
     prices.close = prices.close.astype(float)
 
     # Get price data to wide
     prices = prices.drop_duplicates()
-    prices_wide = prices.pivot(index='date', columns='security_id', values='close').dropna()
+    prices_wide = {yr: df.pivot(index='date', columns='security_id', values='close').dropna() for yr, df in prices.groupby('year')}
+    # prices_wide = prices.pivot(index='date', columns='security_id', values='close').dropna()
 
-    # Calculate covariance matrix
-    prices_cov = CovarianceShrinkage(prices_wide).ledoit_wolf()
+    weights_dict = {}
+    for year, exp_df in returns_df.groupby('year'):
 
-    # Optimize efficient frontier of Mean Variance
-    ef = EfficientFrontier(np.array(expected_returns), prices_cov)
-    # ef.add_objective(objective_functions.L2_reg)  # add a secondary objective
+        # Get prices for available stocks
+        these_prices = prices_wide[year][exp_df.security_id.unique()]
 
-    # Get the allocation weights
-    weights = ef.min_volatility()
+        # Calculate covariance matrix
+        prices_cov = CovarianceShrinkage(these_prices).ledoit_wolf()
+
+        # Optimize efficient frontier of Mean Variance
+        ef = EfficientFrontier(exp_df.to_numpy(), prices_cov)
+        # ef.add_objective(objective_functions.L2_reg)  # add a secondary objective
+
+        # Get the allocation weights
+        weights_dict[year] = ef.min_volatility()
 
     # Discrete allocation from portfolio value
+    latest_weights = weights_dict[max(weights_dict.keys())]
+    # Only do this for current year. Everything prior can be unitless
     latest_prices = prices.loc[prices.groupby('security_id').date.idxmax()].set_index('security_id')
-    disc_allocation, cash = DiscreteAllocation(weights,
-                                         latest_prices.close,
-                                         total_portfolio_value=investment_amount,
-                                         short_ratio=None).greedy_portfolio()
+    disc_allocation, cash = DiscreteAllocation(latest_weights,
+                                               latest_prices.close,
+                                               total_portfolio_value=investment_amount,
+                                               short_ratio=None).greedy_portfolio()
 
     # Format into dataframe
     df_allocation = pd.concat([
-        pd.Series(weights, name='allocation'),
+        pd.Series(latest_weights, name='allocation'),
         pd.Series(disc_allocation, name='shares')
     ], axis=1)
     df_allocation.index.name = 'security_id'

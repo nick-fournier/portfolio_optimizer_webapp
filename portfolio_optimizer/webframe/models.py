@@ -38,6 +38,7 @@ class Portfolio(models.Model):
 class Scores(models.Model):
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
     date = models.DateField(null=True)
+    fiscal_year = models.IntegerField(default=None, null=True)
     pf_score = models.IntegerField(default=None, null=True)
     pf_score_weighted = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     eps = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
