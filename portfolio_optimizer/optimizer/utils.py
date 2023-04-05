@@ -62,16 +62,6 @@ def get_missing(
     # Add missing to out of date tickers
     ood_tickers = {k: v + missing for k, v in ood_tickers.items()}
 
-    # # Get the corresponding symbol
-    # existing_todate = models.SecurityList.objects.filter(id__in=existing_todate).values_list('symbol', flat=True)
-    #
-    # # Find the missing that aren't up to date
-    # out_of_date = set(proposed_tickers).difference(existing_todate)
-    #
-    # # Add to the set of missing
-    # missing.update(out_of_date)
-
-    # return list(missing)
     return ood_tickers
 
 def clean_records(DB_ref_dict=None):
@@ -81,8 +71,6 @@ def clean_records(DB_ref_dict=None):
         DB_ref_dict = {
             'fundamentals': models.Fundamentals,
             'securityprice': models.SecurityPrice,
-            # 'scores': models.Scores,
-            # 'portfolio': models.Portfolio
         }
 
     security_ids = models.SecurityList.objects.values_list('id', flat=True)
@@ -125,19 +113,6 @@ def clean_records(DB_ref_dict=None):
     for field, has_ids in has_records.items():
         SecurityList = models.SecurityList.objects.filter(id__in=has_ids)
         SecurityList.update(**{field: True})
-
-    # # Find incomplete records and remove
-    # if incomplete_records:
-    #     records = models.SecurityList.objects.filter(id__in=incomplete_records)
-    #     print('Incomplete records: ' + ', '.join(records.values_list('symbol', flat=True)))
-    #     records.delete()
-    #     print('Removing from: ')
-    #     for db_name, DB in DB_ref_dict.items():
-    #         print(db_name)
-    #         records = DB.objects.filter(security_id__in=incomplete_records)
-    #         if records.exists():
-    #             records.delete()
-
 
 def get_latest_snp():
     json_path = os.path.join(THIS_PATH, '../fixtures/snp.json')

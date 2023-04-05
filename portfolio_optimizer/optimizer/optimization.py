@@ -27,16 +27,20 @@ def rescore(z, mean, sd):
 def minmax(v):
     return (v - v.min()) / (v.max() - v.min())
 
-
 def get_analysis_data():
-    financials = models.Fundamentals.objects.all().values('security_id', 'date')
-    prices = models.SecurityPrice.objects.all().values('security_id', 'date', 'close')
-    scores = models.Scores.objects.all().values()
+    score_cols = ['security_id', 'date', 'security__symbol', 'fiscal_year', 'pf_score',
+                  'pf_score_weighted', 'eps', 'pe_ratio', 'roa', 'cash', 'cash_ratio',
+                  'delta_cash', 'delta_roa', 'accruals', 'delta_long_lev_ratio',
+                  'delta_current_lev_ratio', 'delta_shares', 'delta_gross_margin', 'delta_asset_turnover']
+
+    # financials = models.Fundamentals.objects.all().values('security_id', 'date')
+    prices_qry = models.SecurityPrice.objects.all().values('security_id', 'date', 'close')
+    scores_qry = models.Scores.objects.all().values(*score_cols)
 
     # As dataframe
-    financials = pd.DataFrame(financials)
-    prices = pd.DataFrame(prices)
-    scores = pd.DataFrame(scores)
+    # financials = pd.DataFrame(financials)
+    prices = pd.DataFrame(prices_qry)
+    df = pd.DataFrame(scores_qry)
 
     # update scores
     # pfobject = piotroski_fscore.GetFscore()
@@ -50,9 +54,6 @@ def get_analysis_data():
     prices_year = prices.groupby([prices.date.dt.year, 'security_id']).close\
         .agg(['last', 'mean', 'var']).reset_index()\
         .rename(columns=col_names)
-
-    # Merged scores & fundamentals
-    df = scores.merge(financials, on=['security_id', 'date'])
 
     # Add year and merge prices
     df.date = pd.to_datetime(df.date)
@@ -69,7 +70,7 @@ class OptimizePorfolio:
     def __init__(self, investment_amount=10000, backcast=False):
         data = get_analysis_data()
         expected_returns = self.forecast_expected_returns(data, backcast)
-        self.portfolio = self.optimize(expected_returns, investment_amount, backcast)
+        self.portfolio = self.optimize(expected_returns, investment_amount)
         # self.save_portfolio()
 
     def forecast_expected_returns(self, company_df, backcast=False):
@@ -77,8 +78,6 @@ class OptimizePorfolio:
         x_cols = ['roa', 'cash_ratio', 'delta_cash', 'delta_roa', 'accruals', 'delta_long_lev_ratio',
                   'delta_current_lev_ratio', 'delta_shares', 'delta_gross_margin', 'delta_asset_turnover']
 
-        # company_df.date = pd.to_datetime(company_df.date)
-        # company_df['year'] = company_df.date.dt.year
         model_df = company_df.set_index(['security_id', 'year'])
         model_df = model_df[x_cols + ['yearly_close']].fillna(0)
 
@@ -133,17 +132,15 @@ class OptimizePorfolio:
 
         return expected_returns
 
-    def optimize(self, expected_returns, investment_amount=10000, backcast=False):
+    def optimize(self, expected_returns, investment_amount=10000):
 
         # Check type
         investment_amount = float(investment_amount)
 
         # # Forecast expected returns
-        # company_df = get_analysis_data()
-        # returns_df = forecast_expected_returns(company_df).reset_index()
         returns_df = expected_returns[~expected_returns.isna()]
 
-        # Some formatting
+        # Some formattingsymbol
         security_ids = returns_df.index.get_level_values('security_id').unique()
         prices = models.SecurityPrice.objects.filter(security_id__in=security_ids)
         prices = pd.DataFrame(prices.values('security_id', 'date', 'close'))
