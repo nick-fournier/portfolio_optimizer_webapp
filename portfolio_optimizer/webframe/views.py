@@ -12,7 +12,7 @@ from django.shortcuts import render
 from rest_framework import viewsets
 
 from ..webframe import models, serializers, forms
-from ..optimizer import utils, optimization, download
+from ..optimizer import utils, optimization, download, plots
 
 import datetime
 import pandas as pd
@@ -66,6 +66,8 @@ class DashboardView(views.generic.FormView):
 
         if scores.exists():
             # context['plots'] = plots.create_plots()
+
+            context['plots'] = plots.compare_ytd()
 
             # Round decimals
             field_dat = models.Scores._meta.get_fields() + models.Portfolio._meta.get_fields()

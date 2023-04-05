@@ -28,58 +28,58 @@ def minmax(v):
     return (v - v.min()) / (v.max() - v.min())
 
 
+def get_analysis_data():
+    financials = models.Fundamentals.objects.all().values('security_id', 'date')
+    prices = models.SecurityPrice.objects.all().values('security_id', 'date', 'close')
+    scores = models.Scores.objects.all().values()
+
+    # As dataframe
+    financials = pd.DataFrame(financials)
+    prices = pd.DataFrame(prices)
+    scores = pd.DataFrame(scores)
+
+    # update scores
+    # pfobject = piotroski_fscore.GetFscore()
+    # pfobject.save_scores()
+
+    # Aggregate price data annually
+    prices.close = prices.close.astype(float)
+    prices.date = pd.to_datetime(prices.date)
+
+    col_names = {'date': 'year', 'last': 'yearly_close', 'var': 'variance'}
+    prices_year = prices.groupby([prices.date.dt.year, 'security_id']).close\
+        .agg(['last', 'mean', 'var']).reset_index()\
+        .rename(columns=col_names)
+
+    # Merged scores & fundamentals
+    df = scores.merge(financials, on=['security_id', 'date'])
+
+    # Add year and merge prices
+    df.date = pd.to_datetime(df.date)
+    df.rename(columns={'fiscal_year': 'year'}, inplace=True)
+    df = df.merge(prices_year, on=['security_id', 'year'])
+
+    # df.yearly_close = df.yearly_close.astype(float)
+    df.pe_ratio = df.pe_ratio.astype(float)
+    df = df.sort_values(['security_id', 'date'])
+
+    # Grouper
+    # grps = df.groupby('security_id', group_keys=False)
+
+    # Some quick calcs
+    # df['order'] = grps.date.rank(ascending=True).astype(int)
+    # df['pct_chg'] = grps['yearly_close'].apply(lambda x: x.pct_change(1))
+    # df['cum_pct_chg'] = grps['yearly_close'].apply(pct_change_from_first)
+    # df['norm_close'] = df.groupby('security_id', group_keys=False)['yearly_close'].apply(lambda x: minmax(x))
+
+    return df
+
 class OptimizePorfolio:
     def __init__(self, investment_amount=10000, backcast=False):
-        data = self.get_analysis_data()
+        data = get_analysis_data()
         expected_returns = self.forecast_expected_returns(data, backcast)
         self.portfolio = self.optimize(expected_returns, investment_amount, backcast)
         # self.save_portfolio()
-
-    def get_analysis_data(self):
-        financials = models.Fundamentals.objects.all().values('security_id', 'date')
-        prices = models.SecurityPrice.objects.all().values('security_id', 'date', 'close')
-        scores = models.Scores.objects.all().values()
-
-        # As dataframe
-        financials = pd.DataFrame(financials)
-        prices = pd.DataFrame(prices)
-        scores = pd.DataFrame(scores)
-
-        # update scores
-        # pfobject = piotroski_fscore.GetFscore()
-        # pfobject.save_scores()
-
-        # Aggregate price data annually
-        prices.close = prices.close.astype(float)
-        prices.date = pd.to_datetime(prices.date)
-
-        col_names = {'date': 'year', 'last': 'yearly_close', 'var': 'variance'}
-        prices_year = prices.groupby([prices.date.dt.year, 'security_id']).close\
-            .agg(['last', 'mean', 'var']).reset_index()\
-            .rename(columns=col_names)
-
-        # Merged scores & fundamentals
-        df = scores.merge(financials, on=['security_id', 'date'])
-
-        # Add year and merge prices
-        df.date = pd.to_datetime(df.date)
-        df.rename(columns={'fiscal_year': 'year'}, inplace=True)
-        df = df.merge(prices_year, on=['security_id', 'year'])
-
-        # df.yearly_close = df.yearly_close.astype(float)
-        df.pe_ratio = df.pe_ratio.astype(float)
-        df = df.sort_values(['security_id', 'date'])
-
-        # Grouper
-        # grps = df.groupby('security_id', group_keys=False)
-
-        # Some quick calcs
-        # df['order'] = grps.date.rank(ascending=True).astype(int)
-        # df['pct_chg'] = grps['yearly_close'].apply(lambda x: x.pct_change(1))
-        # df['cum_pct_chg'] = grps['yearly_close'].apply(pct_change_from_first)
-        # df['norm_close'] = df.groupby('security_id', group_keys=False)['yearly_close'].apply(lambda x: minmax(x))
-
-        return df
 
     def forecast_expected_returns(self, company_df, backcast=False):
 

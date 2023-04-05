@@ -34,14 +34,10 @@ class DownloadCompanyData:
         # Download
         self.download(ood_tickers)
 
-        # if self.the_tickers:
-        #     self.download()
-        # else:
-        #     print('No new tickers to update.')
 
     def download(self, ood_tickers):
         # Generate ID for new security if missing
-        all_tickers = [item for sublist in ood_tickers.values() for item in sublist]
+        all_tickers = list(set([item for sublist in ood_tickers.values() for item in sublist]))
         self.id_table = utils.get_id_table(all_tickers, add_missing=True)
 
         # 1) Fetch company meta data
@@ -72,19 +68,7 @@ class DownloadCompanyData:
             self.set_data(db_name='securityprice', data=securityprice)
 
         # 6) Ensure meta set correctly, rerun clean if not
-        # incomplete = models.SecurityList.objects.filter(sector__isnull=True)
-        # if incomplete:
-        #     # incomplete.delete()
         utils.clean_records()
-
-        # 7) ?
-        # optimization.optimize()
-
-        # self.data = {
-        #     'meta': meta,
-        #     'fundamentals': fundamentals,
-        #     'securityprice': securityprice,
-        # }
 
         print('Database update complete')
 
