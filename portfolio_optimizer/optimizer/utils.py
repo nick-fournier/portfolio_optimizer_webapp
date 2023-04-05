@@ -38,7 +38,9 @@ def get_missing(
     f_elapse = datetime.now() - timedelta(days=fundamentals_months * 30)
 
     # First find ones that aren't in database at all
-    existing = models.SecurityList.objects.filter(Q(symbol__in=proposed_tickers) & Q(sector__isnull=False))
+    existing = models.SecurityList.objects.filter(
+        Q(symbol__in=proposed_tickers) & (Q(sector__isnull=False) | Q(symbol='^GSPC'))
+    )
     missing = list(set(proposed_tickers).difference(existing.values_list('symbol', flat=True)))
 
     # Find latest
@@ -108,8 +110,8 @@ def clean_records(DB_ref_dict=None):
             .filter(count_id__gt=1)
         )
 
+        print(f'removing duplicate entries in {db_name}')
         for duplicate in duplicates:
-            print('removing duplicate entries')
             (
                 DB.objects
                 .filter(**{x: duplicate[x] for x in unique_fields})

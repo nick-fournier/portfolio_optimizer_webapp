@@ -63,15 +63,6 @@ def get_analysis_data():
     df.pe_ratio = df.pe_ratio.astype(float)
     df = df.sort_values(['security_id', 'date'])
 
-    # Grouper
-    # grps = df.groupby('security_id', group_keys=False)
-
-    # Some quick calcs
-    # df['order'] = grps.date.rank(ascending=True).astype(int)
-    # df['pct_chg'] = grps['yearly_close'].apply(lambda x: x.pct_change(1))
-    # df['cum_pct_chg'] = grps['yearly_close'].apply(pct_change_from_first)
-    # df['norm_close'] = df.groupby('security_id', group_keys=False)['yearly_close'].apply(lambda x: minmax(x))
-
     return df
 
 class OptimizePorfolio:
@@ -107,12 +98,11 @@ class OptimizePorfolio:
 
         # Initalize DF to join to
         i = model_df.fy.min() + 1
-        # current_year = model_df.index.get_level_values('year').max()
+
         if not backcast:
             i = model_df.fy.max()
 
         while i <= model_df.fy.max():
-        # for i in range(model_df.year.min() + 1, model_df.year.max()):
             # Model matrix for time<i
             df_t = model_df[model_df.fy < i]
             # Drop any missing years

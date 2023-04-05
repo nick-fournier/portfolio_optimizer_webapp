@@ -67,7 +67,7 @@ class DashboardView(views.generic.FormView):
         if scores.exists():
             # context['plots'] = plots.create_plots()
 
-            context['plots'] = plots.compare_ytd()
+            context['plots']['spx'] = plots.compare_ytd()
 
             # Round decimals
             field_dat = models.Scores._meta.get_fields() + models.Portfolio._meta.get_fields()
