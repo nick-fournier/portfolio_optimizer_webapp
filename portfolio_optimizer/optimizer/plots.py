@@ -19,6 +19,9 @@ def compare_ytd():
     portfolio_qry = models.Portfolio.objects.filter(allocation__gt=0)
     portfolio_df = pd.DataFrame(portfolio_qry.values('security_id', 'security__symbol', 'allocation'))
 
+    if portfolio_df.empty:
+        return
+
     # Get symbols and IDs
     symbol_list = portfolio_df.security__symbol.to_list() + ['^GSPC']
 

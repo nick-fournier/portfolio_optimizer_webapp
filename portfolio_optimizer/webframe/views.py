@@ -3,8 +3,7 @@
 
 from django.urls import reverse_lazy
 from django.http import HttpResponseRedirect
-from django.db.models import Max
-
+from django.db.models import Max, Subquery, OuterRef
 
 from django.views.generic.edit import FormView
 from django import views
@@ -61,8 +60,12 @@ class DashboardView(views.generic.FormView):
         scores_fields += related_fields
 
         # Only most recent
-        scores = models.Scores.objects.values('security_id').annotate(most_recent=Max('date'))
-        scores = scores.filter(date__in=scores.values('most_recent')).order_by('-date').values(*scores_fields)
+        scores = models.Scores.objects.values(*scores_fields)
+        # scores = models.Scores.objects.values('security_id').annotate(most_recent=Max('fiscal_year'))
+        # scores = scores.filter(fiscal_year__in=scores.values('most_recent')).order_by('-date').values(*scores_fields)
+        # latest_scores = models.Scores.objects.filter(security=OuterRef('pk')).order_by(-'fiscal_year')
+        # models.Scores.objects.annotate(latest=Subquery(latest_scores.values('fiscal_year')[:1]),
+        #                        thread_id=Subquery(latest_scores.values('pk')[:1]))
 
         if scores.exists():
             # context['plots'] = plots.create_plots()
@@ -75,6 +78,8 @@ class DashboardView(views.generic.FormView):
 
             # Formatting
             df_scores = pd.DataFrame(scores)
+            df_scores = df_scores.loc[df_scores.groupby(["security"])["fiscal_year"].idxmax()]
+
             df_scores = df_scores.astype({x: float for x in decimal_fields if x in df_scores.columns})
             df_scores = df_scores.rename(columns={x: x.split('__')[-1] for x in related_fields})
             df_scores = df_scores.sort_values(['allocation', 'symbol', 'date', 'pf_score'],

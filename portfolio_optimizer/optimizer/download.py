@@ -1,7 +1,7 @@
 
 from django.db.models import Q
 from ..webframe import models
-from ..optimizer import utils, piotroski_fscore
+from ..optimizer import utils, piotroski_fscore, optimization
 import pandas as pd
 import yahooquery as yq
 import datetime
@@ -69,6 +69,10 @@ class DownloadCompanyData:
 
         # 6) Ensure meta set correctly, rerun clean if not
         utils.clean_records()
+
+        # 7) Optimize at default amount
+        optimization.OptimizePorfolio()
+
 
         print('Database update complete')
 

@@ -69,6 +69,7 @@ def get_analysis_data():
 class OptimizePorfolio:
     def __init__(self, investment_amount=10000, backcast=False):
         data = get_analysis_data()
+
         expected_returns = self.forecast_expected_returns(data, backcast)
         self.portfolio = self.optimize(expected_returns, investment_amount)
         # self.save_portfolio()
