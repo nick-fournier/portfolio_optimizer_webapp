@@ -58,6 +58,7 @@ class DownloadCompanyData:
             # 4) Filter out stock picks by score threshold. Keep any that ever exceed it (for backtesting)
             max_ticker_scores = (PFScores.scores.pf_score > self.score_cutoff).groupby('symbol').any()
             price_tickers = max_ticker_scores[max_ticker_scores >= self.score_cutoff].index
+
             # Add out of date prices to update, remove duplicates
             ood_tickers['securityprice'].extend(price_tickers)
             ood_tickers['securityprice'] = set(ood_tickers['securityprice'])
@@ -71,7 +72,7 @@ class DownloadCompanyData:
         utils.clean_records()
 
         # 7) Optimize at default amount
-        optimization.OptimizePorfolio()
+        # optimization.OptimizePorfolio()
 
 
         print('Database update complete')
@@ -130,6 +131,19 @@ class DownloadCompanyData:
         fundamentals.rename(columns={**{'asOfDate': 'date'}, **fields_map}, inplace=True)
         fundamentals.drop(columns=['periodType', 'currencyCode'], inplace=True)
         fundamentals = fundamentals.join(self.id_table.set_index('symbol'))
+
+        # # Add fiscal year
+        # fundamentals['dtdate'] = pd.to_datetime(fundamentals.date)
+        # fy_dates = [f"{x}-12-31" for x in range(fundamentals.dtdate.dt.year.min()-1, datetime.date.today().year)]
+        # fy_dates = pd.to_datetime(fy_dates).to_frame(name='fiscal_year')
+        # fy_dates.fiscal_year = fy_dates.fiscal_year.dt.year
+        #
+        # # Match to nearest FY
+        # fundamentals = pd.merge_asof(fundamentals.sort_values('dtdate'),
+        #                              fy_dates,
+        #                              left_on='dtdate', right_index=True,
+        #                              direction='nearest')
+        # fundamentals.drop(columns='dtdate')
 
         # Add empty fields if missing
         for f in fields_map.values():
@@ -229,5 +243,9 @@ class DownloadCompanyData:
         if not new_data.empty:
             print('Updating ' + db_name + ' data...')
             DB.objects.bulk_create(DB(**vals) for vals in new_data.to_dict('records'))
+            if db_name in ['fundamentals', 'scores']:
+                for rec in DB.objects.filter(fiscal_year__isnull=True):
+                    rec.save()
+
         else:
             print(db_name + ' already up to date')

@@ -1,7 +1,7 @@
 import datetime
 
 from django.db import models
-
+import pandas as pd
 
 # TODO Clean up the data fields to be more efficent (e.g., divide by million, as int, etc.
 #  Or at least convert int to IntegerFields. May cause issue with NAs?
@@ -58,6 +58,20 @@ class Scores(models.Model):
     # yearly_close = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     # yearly_variance = models.DecimalField(max_digits=17, null=True, decimal_places=2)
 
+    def get_fiscal_year(self):
+        # Add fiscal year
+        the_date = pd.to_datetime(self.date)
+        fy_dates = {x: pd.to_datetime(f"{x}-12-31") for x in range(the_date.year - 1, datetime.date.today().year)}
+        # get all differences with date as values
+        cloz_dict = {abs(the_date.timestamp() - fydate.timestamp()): yr for yr, fydate in fy_dates.items()}
+        # extracting minimum key using min()
+        result = cloz_dict[min(cloz_dict.keys())]
+        return result
+
+    def save(self, *args, **kwargs):
+        self.fiscal_year = self.get_fiscal_year()
+        super(Scores, self).save(*args, **kwargs)
+
 class SecurityPrice(models.Model):
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
     date = models.DateField(null=True)
@@ -70,9 +84,11 @@ class SecurityPrice(models.Model):
     # splits = models.IntegerField(default=None, null=True)
     volume = models.IntegerField(default=None, null=True)
 
+
 class Fundamentals(models.Model):
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
     date = models.DateField(null=True)
+    fiscal_year = models.IntegerField(default=None, null=True)
     net_income = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     net_income_common_stockholders = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     total_liabilities = models.DecimalField(max_digits=17, null=True, decimal_places=2)
@@ -83,3 +99,17 @@ class Fundamentals(models.Model):
     cash = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     gross_profit = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     total_revenue = models.DecimalField(max_digits=17, null=True, decimal_places=2)
+
+    def get_fiscal_year(self):
+        # Add fiscal year
+        the_date = pd.to_datetime(self.date)
+        fy_dates = {x: pd.to_datetime(f"{x}-12-31") for x in range(the_date.year - 1, datetime.date.today().year)}
+        # get all differences with date as values
+        cloz_dict = {abs(the_date.timestamp() - fydate.timestamp()): yr for yr, fydate in fy_dates.items()}
+        # extracting minimum key using min()
+        result = cloz_dict[min(cloz_dict.keys())]
+        return result
+
+    def save(self, *args, **kwargs):
+        self.fiscal_year = self.get_fiscal_year()
+        super(Fundamentals, self).save(*args, **kwargs)

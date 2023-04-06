@@ -56,6 +56,8 @@ def compare_ytd():
     compare_df = compare_df.melt(ignore_index=False)
 
     fig = px.line(compare_df.reset_index(), x="date", y="value", color="variable")
+    fig.layout.yaxis.tickformat = ',.0%'
+
     return plot(fig, output_type='div')
 
 

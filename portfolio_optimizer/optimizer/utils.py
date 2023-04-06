@@ -30,12 +30,13 @@ def get_id_table(tickers, add_missing=False):
 def get_missing(
         proposed_tickers,
         prices_days=30,
-        fundamentals_months=6
+        fundamentals_months=8
         ):
 
     # Elapsed time before updating data
     p_elapse = datetime.now() - timedelta(days=prices_days)
     f_elapse = datetime.now() - timedelta(days=fundamentals_months * 30)
+    f_thisyear = datetime.today().year
 
     # First find ones that aren't in database at all
     existing = models.SecurityList.objects.filter(
@@ -49,7 +50,8 @@ def get_missing(
 
     # Then find any that are out of date
     ood_meta = models.SecurityList.objects.filter(Q(symbol__in=existing) & Q(last_updated__lte=f_elapse))
-    ood_fundamentals = latest_fundamentals.filter(Q(security_id__in=existing) & Q(date__lte=f_elapse))
+    # ood_fundamentals = latest_fundamentals.filter(Q(security_id__in=existing) & Q(date__lte=f_elapse))
+    ood_fundamentals = latest_fundamentals.filter(Q(security_id__in=existing) & Q(fiscal_year__lte=f_thisyear))
     ood_prices = latest_prices.filter(Q(security_id__in=existing) & Q(date__lte=p_elapse))
 
     # Combine into dictionary

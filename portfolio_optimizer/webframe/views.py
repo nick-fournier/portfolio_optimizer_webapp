@@ -61,11 +61,6 @@ class DashboardView(views.generic.FormView):
 
         # Only most recent
         scores = models.Scores.objects.values(*scores_fields)
-        # scores = models.Scores.objects.values('security_id').annotate(most_recent=Max('fiscal_year'))
-        # scores = scores.filter(fiscal_year__in=scores.values('most_recent')).order_by('-date').values(*scores_fields)
-        # latest_scores = models.Scores.objects.filter(security=OuterRef('pk')).order_by(-'fiscal_year')
-        # models.Scores.objects.annotate(latest=Subquery(latest_scores.values('fiscal_year')[:1]),
-        #                        thread_id=Subquery(latest_scores.values('pk')[:1]))
 
         if scores.exists():
             # context['plots'] = plots.create_plots()

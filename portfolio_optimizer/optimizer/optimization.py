@@ -9,10 +9,12 @@
 """
 
 from ..webframe import models
+from django.db.models import Q, Max, OuterRef, Subquery
 from . import piotroski_fscore
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from sklearn.neural_network import MLPRegressor
 import scipy.stats as stats
 from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt.risk_models import CovarianceShrinkage
@@ -28,8 +30,8 @@ def minmax(v):
     return (v - v.min()) / (v.max() - v.min())
 
 def get_analysis_data():
-    score_cols = ['security_id', 'date', 'security__symbol', 'fiscal_year', 'pf_score',
-                  'pf_score_weighted', 'eps', 'pe_ratio', 'roa', 'cash', 'cash_ratio',
+    score_cols = ['security_id', 'date', 'security__symbol', 'fiscal_year',
+                  'pf_score', 'pf_score_weighted', 'eps', 'pe_ratio', 'roa', 'cash', 'cash_ratio',
                   'delta_cash', 'delta_roa', 'accruals', 'delta_long_lev_ratio',
                   'delta_current_lev_ratio', 'delta_shares', 'delta_gross_margin', 'delta_asset_turnover']
 
@@ -40,7 +42,9 @@ def get_analysis_data():
     # As dataframe
     # financials = pd.DataFrame(financials)
     prices = pd.DataFrame(prices_qry)
-    df = pd.DataFrame(scores_qry)
+    df = pd.DataFrame(scores_qry).rename(columns={'security__fundamentals__fiscal_year': 'year'})
+
+    pd.DataFrame(models.Scores.objects.all().values('security_id', 'date', 'security__fundamentals__fiscal_year'))
 
     # update scores
     # pfobject = piotroski_fscore.GetFscore()
@@ -67,19 +71,23 @@ def get_analysis_data():
     return df
 
 class OptimizePorfolio:
-    def __init__(self, investment_amount=10000, backcast=False):
+    def __init__(self, investment_amount=10000, threshold=6, objective='max_sharpe', backcast=False):
         data = get_analysis_data()
-        expected_returns = self.forecast_expected_returns(data, backcast)
-        self.portfolio = self.optimize(expected_returns, investment_amount)
+        expected_returns = self.forecast_expected_returns(data, backcast=backcast)
+        self.portfolio = self.optimize(
+            expected_returns=expected_returns,
+            investment_amount=investment_amount,
+            threshold=threshold,
+            objective=objective
+        )
         # self.save_portfolio()
 
-    def forecast_expected_returns(self, company_df, backcast=False):
+    def forecast_expected_returns(self, company_df, backcast=False, method='nn'):
 
         x_cols = ['roa', 'cash_ratio', 'delta_cash', 'delta_roa', 'accruals', 'delta_long_lev_ratio',
                   'delta_current_lev_ratio', 'delta_shares', 'delta_gross_margin', 'delta_asset_turnover']
 
-        model_df = company_df.set_index(['security_id', 'year'])
-        model_df = model_df[x_cols + ['yearly_close']].fillna(0)
+        model_df = company_df.set_index(['security_id', 'year'])[x_cols + ['yearly_close']].copy().astype(float)
 
         # Get lagged value of features from t-1
         model_df['lag_close'] = model_df.groupby('security_id', group_keys=False)['yearly_close'].shift(-1)
@@ -87,7 +95,10 @@ class OptimizePorfolio:
         # Normalize close price within group since that's company-level feature, all else are high level
         df_grps = model_df[~model_df.lag_close.isnull()].groupby('security_id', group_keys=False)
         model_df.loc[~model_df.lag_close.isnull(), 'norm_lag_close'] = df_grps['lag_close'].apply(stats.zscore)
-        # df_t[x_cols].apply(stats.zscore)
+
+        # Drop/fill NA and normalize
+        model_df = model_df.dropna(subset=x_cols)
+        model_df.loc[:, x_cols] = model_df[x_cols].apply(stats.zscore)
 
         # Store mean and std dev for later
         grp_stats = df_grps['lag_close'].agg(mean=np.mean, std=np.std)
@@ -105,18 +116,22 @@ class OptimizePorfolio:
             # Model matrix for time<i
             df_t = model_df[model_df.fy < i]
             # Drop any missing years
-            df_t = df_t[~df_t.lag_close.isna()]
+            df_t = df_t[~df_t.norm_lag_close.isna()]
             # Prediction matrix for time i
             df_t0 = model_df[model_df.fy == i]
 
             # Assemble matrices
-            y = df_t['norm_lag_close'].to_numpy()
-            x = df_t[x_cols].astype(float).to_numpy()
+            y = df_t['norm_lag_close']#.to_numpy()
+            x = df_t[x_cols].astype(float)#.to_numpy()
 
             # Estimate model
-            model = LinearRegression().fit(x, y)
+            if method == 'nn':
+                model = MLPRegressor(max_iter=1000).fit(x, y)
+            else:
+                model = LinearRegression().fit(x, y)
+                print(pd.Series(list(model.coef_), index=x_cols))
             print(f'R^2 = {model.score(x, y)}')
-            print(pd.Series(list(model.coef_), index=x_cols))
+
 
             # Make predictions
             yhat = pd.DataFrame(model.predict(df_t0[x_cols]), index=df_t0.index, columns=['yhat']).join(grp_stats)
@@ -132,7 +147,7 @@ class OptimizePorfolio:
 
         return expected_returns
 
-    def optimize(self, expected_returns, investment_amount=10000):
+    def optimize(self, expected_returns, investment_amount=10000, threshold=6, objective='max_sharpe'):
 
         # Check type
         investment_amount = float(investment_amount)
@@ -140,8 +155,18 @@ class OptimizePorfolio:
         # # Forecast expected returns
         returns_df = expected_returns[~expected_returns.isna()]
 
-        # Some formattingsymbol
-        security_ids = returns_df.index.get_level_values('security_id').unique()
+        # Remove companies below score threshold
+        returns_ids = returns_df.index.get_level_values('security_id').unique()
+
+        # Find company IDs above threshold for current year and has forecasted return data available
+        sq = models.Scores.objects.filter(security_id=OuterRef('security_id')).order_by('-fiscal_year')
+        security_ids = list(
+            models.Scores.objects.filter(
+                Q(pk=Subquery(sq.values('pk')[:1])) & Q(pf_score__gte=threshold) & Q(security_id__in=returns_ids)
+            ).values_list('security_id', flat=True)
+        )
+
+        # Some formatting
         prices = models.SecurityPrice.objects.filter(security_id__in=security_ids)
         prices = pd.DataFrame(prices.values('security_id', 'date', 'close'))
         prices.date = pd.to_datetime(prices.date)
@@ -150,15 +175,24 @@ class OptimizePorfolio:
 
         # Get price data to wide
         prices = prices.drop_duplicates()
-        prices_wide = {yr: df.pivot(index='date', columns='security_id', values='close').dropna() for yr, df in prices.groupby('year')}
+        # prices_wide = {yr: df.pivot(index='date', columns='security_id', values='close').dropna() for yr, df in prices.groupby('year')}
         # prices_wide = prices.pivot(index='date', columns='security_id', values='close').dropna()
 
         weights_dict = {}
         for year, exp_df in returns_df.groupby(level='year'):
 
-            # Get prices for available stocks
-            security_ids = exp_df.index.get_level_values('security_id').unique()
-            these_prices = prices_wide[year][security_ids]
+            # Get prices for available stocks, # Remove companies below score threshold
+            exp_ids = exp_df.index.get_level_values('security_id').unique()
+            year_ids = list(set(security_ids).intersection(exp_ids))
+
+            # Cast prices data to wide form
+            prices_wide = prices[prices.year == year]\
+                .pivot(index='date', columns='security_id', values='close')\
+                .dropna()
+
+            # make data consistent
+            exp_df = exp_df.loc[security_ids]
+            these_prices = prices_wide[year_ids]
 
             # Calculate covariance matrix
             prices_cov = CovarianceShrinkage(these_prices).ledoit_wolf()
@@ -168,7 +202,11 @@ class OptimizePorfolio:
             # ef.add_objective(objective_functions.L2_reg)  # add a secondary objective
 
             # Get the allocation weights
-            weights_dict[year] = ef.min_volatility()
+            if objective == 'max_sharpe':
+                weights_dict[year] = ef.max_sharpe()
+            else:
+                weights_dict[year] = ef.min_volatility()
+
 
         # Discrete allocation from portfolio value
         portfolio_year = max(weights_dict.keys())
@@ -197,6 +235,7 @@ class OptimizePorfolio:
         df_allocation['year'] = portfolio_year
 
         return df_allocation
+
     def save_portfolio(self):
         # Send to database
         if not self.portfolio.empty:
