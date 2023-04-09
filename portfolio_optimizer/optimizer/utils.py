@@ -3,6 +3,7 @@ import os
 import json
 import pandas as pd
 from datetime import datetime, timedelta
+from django.utils.timezone import utc
 from urllib import request
 from itertools import islice
 from django.db.models import Q, Max, Count, OuterRef, Subquery
@@ -34,9 +35,11 @@ def get_missing(
         ):
 
     # Elapsed time before updating data
-    meta_lapse_date =datetime.now() - timedelta(days=meta_lapse_days)
-    price_lapse_date = datetime.now() - timedelta(days=prices_lapse_days)
-    current_year = datetime.today().year
+    now = datetime.utcnow().replace(tzinfo=utc)
+
+    meta_lapse_date = now - timedelta(days=meta_lapse_days)
+    price_lapse_date = now - timedelta(days=prices_lapse_days)
+    current_year = now.year
 
     # tickers in db of proposed ones
     in_db =  models.SecurityList.objects.filter(symbol__in=proposed_tickers)
