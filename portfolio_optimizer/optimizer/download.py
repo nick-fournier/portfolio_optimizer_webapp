@@ -132,19 +132,6 @@ class DownloadCompanyData:
         fundamentals.drop(columns=['periodType', 'currencyCode'], inplace=True)
         fundamentals = fundamentals.join(self.id_table.set_index('symbol'))
 
-        # # Add fiscal year
-        # fundamentals['dtdate'] = pd.to_datetime(fundamentals.date)
-        # fy_dates = [f"{x}-12-31" for x in range(fundamentals.dtdate.dt.year.min()-1, datetime.date.today().year)]
-        # fy_dates = pd.to_datetime(fy_dates).to_frame(name='fiscal_year')
-        # fy_dates.fiscal_year = fy_dates.fiscal_year.dt.year
-        #
-        # # Match to nearest FY
-        # fundamentals = pd.merge_asof(fundamentals.sort_values('dtdate'),
-        #                              fy_dates,
-        #                              left_on='dtdate', right_index=True,
-        #                              direction='nearest')
-        # fundamentals.drop(columns='dtdate')
-
         # Add empty fields if missing
         for f in fields_map.values():
             if f not in fundamentals.columns:

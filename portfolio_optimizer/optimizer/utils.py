@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from urllib import request
 from itertools import islice
-from django.db.models import Q, Max, Count
+from django.db.models import Q, Max, Count, OuterRef, Subquery
 from ..webframe import models
 
 
@@ -13,10 +13,10 @@ THIS_PATH = os.path.dirname(__file__)
 
 def get_id_table(tickers, add_missing=False):
     # if missing from security list, add it
-    db_syms = models.SecurityList.objects.filter(symbol__in=tickers).values_list('symbol', flat=True)
+    in_db = models.SecurityList.objects.filter(symbol__in=tickers).values_list('symbol', flat=True)
+    not_in_db = list(set(tickers) - set(in_db))
 
-    missing = list(set(tickers).difference(db_syms))
-    if missing and add_missing:
+    if not_in_db and add_missing:
         models.SecurityList.objects.bulk_create(
             models.SecurityList(**{'symbol': vals}) for vals in missing
         )
@@ -29,40 +29,57 @@ def get_id_table(tickers, add_missing=False):
 
 def get_missing(
         proposed_tickers,
-        prices_days=30,
-        fundamentals_months=8
+        prices_lapse_days=1,
+        meta_lapse_days=90
         ):
 
     # Elapsed time before updating data
-    p_elapse = datetime.now() - timedelta(days=prices_days)
-    f_elapse = datetime.now() - timedelta(days=fundamentals_months * 30)
-    f_thisyear = datetime.today().year
+    meta_lapse_date =datetime.now() - timedelta(days=meta_lapse_days)
+    price_lapse_date = datetime.now() - timedelta(days=prices_lapse_days)
+    current_year = datetime.today().year
 
-    # First find ones that aren't in database at all
-    existing = models.SecurityList.objects.filter(
-        Q(symbol__in=proposed_tickers) & (Q(sector__isnull=False) | Q(symbol='^GSPC'))
-    )
-    missing = list(set(proposed_tickers).difference(existing.values_list('symbol', flat=True)))
+    # tickers in db of proposed ones
+    in_db =  models.SecurityList.objects.filter(symbol__in=proposed_tickers)
 
-    # Find latest
-    latest_fundamentals = models.Fundamentals.objects.values('security_id').annotate(date=Max('date'))
-    latest_prices = models.SecurityPrice.objects.values('security_id').annotate(date=Max('date'))
+    # First find ones that are out of date
+    ood_all = in_db.filter(
+        # Q(symbol__in=proposed_tickers) & # is in our target list
+        Q(last_updated__lte=meta_lapse_date) &  # is out of date
+        (Q(sector__isnull=False) | Q(symbol='^GSPC'))  # Is SP500 index and not a previous bad symbol call
+    ).values_list('symbol', flat=True)
 
-    # Then find any that are out of date
-    ood_meta = models.SecurityList.objects.filter(Q(symbol__in=existing) & Q(last_updated__lte=f_elapse))
-    # ood_fundamentals = latest_fundamentals.filter(Q(security_id__in=existing) & Q(date__lte=f_elapse))
-    ood_fundamentals = latest_fundamentals.filter(Q(security_id__in=existing) & Q(fiscal_year__lte=f_thisyear))
-    ood_prices = latest_prices.filter(Q(security_id__in=existing) & Q(date__lte=p_elapse))
 
-    # Combine into dictionary
-    ood_tickers = {
-        'meta': list(ood_meta.values_list('id', flat=True)),
-        'fundamentals': list(ood_fundamentals.values_list('security__symbol', flat=True)),
-        'securityprice': list(ood_prices.values_list('security__symbol', flat=True))
-    }
+    # Find ones that aren't in database at all
+    not_in_db = set(proposed_tickers) - set(in_db.values_list('symbol', flat=True))
+        
+    ood_tickers = {'meta': [], 'fundamentals': [], 'securityprice': []}
 
-    # Add missing to out of date tickers
-    ood_tickers = {k: v + missing for k, v in ood_tickers.items()}
+    # If nothing to update, exit
+    if not ood_all and not not_in_db:
+        return ood_tickers
+
+    if ood_all:
+        # Then find any out of date meta data records
+        ood_tickers['metas'] = models.SecurityList.objects.filter(Q(symbol__in=ood_all) & Q(last_updated__lt=price_lapse_date))
+
+        # Find any out of date fundamentals
+        sq = models.Fundamentals.objects.filter(security_id=OuterRef('security_id')).order_by('-fiscal_year')
+        ood_tickers['fundamentals'] = list(
+            models.Fundamentals.objects.filter(
+                Q(pk=Subquery(sq.values('pk')[:1])) & Q(security__symbol__in=ood_all) & Q(fiscal_year__lt=current_year)
+            ).values_list('security__symbol', flat=True)
+        )
+
+        # Find any out of date price records
+        sq = models.SecurityPrice.objects.filter(security_id=OuterRef('security_id')).order_by('-date')
+        ood_tickers['securityprice'] = list(
+            models.SecurityPrice.objects.filter(
+                Q(pk=Subquery(sq.values('pk')[:1])) & Q(security__symbol__in=ood_all) & Q(date__lt=price_lapse_date)
+            ).values_list('security__symbol', flat=True)
+        )
+
+    # Add outright missing to out of date tickers
+    ood_tickers = {k: v + not_in_db for k, v in ood_tickers.items()}
 
     return ood_tickers
 
@@ -100,7 +117,8 @@ def clean_records(DB_ref_dict=None):
             .filter(count_id__gt=1)
         )
 
-        print(f'removing duplicate entries in {db_name}')
+        if duplicates:
+            print(f'removing duplicate entries in {db_name}')
         for duplicate in duplicates:
             (
                 DB.objects
@@ -115,6 +133,19 @@ def clean_records(DB_ref_dict=None):
     for field, has_ids in has_records.items():
         SecurityList = models.SecurityList.objects.filter(id__in=has_ids)
         SecurityList.update(**{field: True})
+
+    # # Find incomplete records and remove
+    # if incomplete_records:
+    #     records = models.SecurityList.objects.filter(id__in=incomplete_records)
+    #     print('Incomplete records: ' + ', '.join(records.values_list('symbol', flat=True)))
+    #     records.delete()
+    #     print('Removing from: ')
+    #     for db_name, DB in DB_ref_dict.items():
+    #         print(db_name)
+    #         records = DB.objects.filter(security_id__in=incomplete_records)
+    #         if records.exists():
+    #             records.delete()
+
 
 def get_latest_snp():
     json_path = os.path.join(THIS_PATH, '../fixtures/snp.json')
