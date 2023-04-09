@@ -8,8 +8,22 @@ import pandas as pd
 # TODO user-specific entries?
 
 class DataSettings(models.Model):
+    OBJ_CHOICES = [
+        ('max_sharpe', 'Maximum Sharpe Ratio'),
+        ('min_volatility', 'Minimum Volatility')
+    ]
+    ESTIMATION_CHOICES = [
+        ('nn', 'Neural Net'),
+        ('lm', 'Linear Regression')
+    ]
+
     start_date = models.DateField(default=datetime.date(2010, 1, 1))
-    investment_amount = models.DecimalField(max_digits=17, null=True, decimal_places=2, default=10000)
+    investment_amount = models.FloatField(default=10000)
+    FScore_threshold = models.IntegerField(default=6)
+    objective = models.CharField(default='max_sharpe', choices=OBJ_CHOICES, max_length=16)
+    estimation_method = models.CharField(default='max_sharpe', choices=ESTIMATION_CHOICES, max_length=16)
+    l2_gamma = models.FloatField(default=2)
+
 
 class SecurityList(models.Model):
     symbol = models.CharField(default=None, null=True, max_length=12)

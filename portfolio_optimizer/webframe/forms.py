@@ -40,8 +40,25 @@ class CommaSeparatedCharField(forms.Field):
         self.run_validators(value)
         return value
 
-class OptimizeForm(forms.Form):
-    investment_amount = forms.DecimalField(initial=10000)
+# class OptimizeForm(forms.Form):
+#     OBJ_CHOICES =[
+#         ('max_sharpe', 'Maximum Sharpe Ratio'),
+#         ('min_volatility', 'Minimum Volatility')
+#     ]
+#
+#     investment_amount = forms.DecimalField(initial=10000)
+#     FScore_threshold = forms.IntegerField(initial=6)
+#     objective = forms.ChoiceField(choices=OBJ_CHOICES, initial='max_sharpe')
+
+class OptimizeForm(forms.ModelForm):
+    class Meta:
+        model = models.DataSettings
+        fields = ['investment_amount',
+                  'FScore_threshold',
+                  'objective',
+                  'estimation_method',
+                  'l2_gamma']
+
 
 class MultipleForm(forms.Form):
     action = forms.CharField(max_length=60, widget=forms.HiddenInput())
