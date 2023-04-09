@@ -19,6 +19,7 @@ import scipy.stats as stats
 from pypfopt.efficient_frontier import EfficientFrontier
 from pypfopt.risk_models import CovarianceShrinkage
 from pypfopt.discrete_allocation import DiscreteAllocation
+from pypfopt.objective_functions import L2_reg
 
 def pct_change_from_first(x):
     return (x - x.iloc[0])/x.iloc[0]
@@ -71,14 +72,22 @@ def get_analysis_data():
     return df
 
 class OptimizePorfolio:
-    def __init__(self, investment_amount=10000, threshold=6, objective='max_sharpe', backcast=False):
+    def __init__(self,
+                 investment_amount=10000,
+                 threshold=6,
+                 objective='max_sharpe',
+                 method='nn',
+                 l2_gamma=2,
+                 backcast=False
+                 ):
         data = get_analysis_data()
-        expected_returns = self.forecast_expected_returns(data, backcast=backcast)
+        expected_returns = self.forecast_expected_returns(data, backcast=backcast, method=method)
         self.portfolio = self.optimize(
             expected_returns=expected_returns,
             investment_amount=investment_amount,
             threshold=threshold,
-            objective=objective
+            objective=objective,
+            l2_gamma=l2_gamma
         )
         # self.save_portfolio()
 
@@ -147,7 +156,7 @@ class OptimizePorfolio:
 
         return expected_returns
 
-    def optimize(self, expected_returns, investment_amount=10000, threshold=6, objective='max_sharpe'):
+    def optimize(self, expected_returns, investment_amount=10000, threshold=6, objective='max_sharpe', l2_gamma=2):
 
         # Check type
         investment_amount = float(investment_amount)
@@ -199,7 +208,8 @@ class OptimizePorfolio:
 
             # Optimize efficient frontier of Mean Variance
             ef = EfficientFrontier(exp_df.to_numpy(), prices_cov)
-            # ef.add_objective(objective_functions.L2_reg)  # add a secondary objective
+            # Reduces 0 weights
+            ef.add_objective(L2_reg, gamma=5)
 
             # Get the allocation weights
             if objective == 'max_sharpe':
