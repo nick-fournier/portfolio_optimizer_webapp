@@ -33,13 +33,38 @@ class DashboardView(views.generic.FormView):
     template_name = 'optimizer/dashboard.html'
     success_url = reverse_lazy('dashboard')
 
-    # def post(self, request, *args, **kwargs):
-    #     optimization.optimize()
-    #     return HttpResponseRedirect(reverse_lazy('dashboard'))
+    if not models.DataSettings.objects.exists():
+        # Initialize empty database with defaults
+        saved_initials = models.DataSettings.objects.create()
+    else:
+        saved_initials = models.DataSettings.objects.get(id=1)
+
+    def get_initial(self):
+        initial = super().get_initial()
+
+        for setting in self.form_class.Meta.fields:
+            initial[setting] = self.request.POST.get(setting, getattr(self.saved_initials, setting))
+
+        return initial
 
     def form_valid(self, form):
         investment_amount = form.cleaned_data['investment_amount']
-        optimalPortfolio = optimization.OptimizePorfolio(investment_amount)
+        objective = form.cleaned_data['objective']
+        threshold = form.cleaned_data['FScore_threshold']
+        method = form.cleaned_data['estimation_method']
+        gamma = form.cleaned_data['l2_gamma']
+
+        for setting in self.form_class.Meta.fields:
+            setattr(self.saved_initials, setting, form.cleaned_data[setting])
+        self.saved_initials.save()
+
+        optimalPortfolio = optimization.OptimizePorfolio(
+            investment_amount=investment_amount,
+            objective=objective,
+            threshold=threshold,
+            method=method,
+            l2_gamma=gamma
+        )
         optimalPortfolio.save_portfolio()
 
         return HttpResponseRedirect(reverse_lazy('dashboard'))
