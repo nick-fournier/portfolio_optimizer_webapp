@@ -4,14 +4,17 @@
 from django.urls import reverse_lazy
 from django.http import HttpResponseRedirect
 from django.db.models import Max, Subquery, OuterRef
+from django.db import connection
 
 from django.views.generic.edit import FormView
 from django import views
 from django.shortcuts import render
 from rest_framework import viewsets
 
-from ..webframe import models, serializers, forms
-from ..optimizer import utils, optimization, download, plots
+from .forms import OptimizeForm, AddDataForm
+from .models import Scores, DataSettings, Portfolio, SecurityList
+from .optimizer import utils, optimization, download, plots
+from .serializers import DataSettingsSerializer
 
 import datetime
 import pandas as pd
@@ -27,21 +30,25 @@ def index(request):
 # uvicorn config.asgi:application --reload
 
 # class DashboardView(views.generic.ListView):
-class DashboardView(views.generic.FormView):
-    model = models.Scores
-    form_class = forms.OptimizeForm
+class DashboardView(FormView):
+    model = Scores
+    form_class = OptimizeForm
     template_name = 'optimizer/dashboard.html'
     success_url = reverse_lazy('dashboard')
-
-    if not models.DataSettings.objects.exists():
-        # Initialize empty database with defaults
-        saved_initials = models.DataSettings.objects.create()
-    else:
-        saved_initials = models.DataSettings.objects.get(id=1)
+    
+    # Hacky, but need this to avoid makemigration no such table error
+    if 'portfolio_optimizer_datasettings' in connection.introspection.table_names():
+        if not DataSettings.objects.exists():
+            # Initialize empty database with defaults
+            saved_initials = DataSettings.objects.create()
+        else:
+            saved_initials = DataSettings.objects.get(id=1)
 
     def get_initial(self):
         initial = super().get_initial()
-
+        
+        assert self.form_class is not None
+        
         for setting in self.form_class.Meta.fields:
             initial[setting] = self.request.POST.get(setting, getattr(self.saved_initials, setting))
 
@@ -53,6 +60,8 @@ class DashboardView(views.generic.FormView):
         threshold = form.cleaned_data['FScore_threshold']
         method = form.cleaned_data['estimation_method']
         gamma = form.cleaned_data['l2_gamma']
+
+        assert self.form_class is not None
 
         for setting in self.form_class.Meta.fields:
             setattr(self.saved_initials, setting, form.cleaned_data[setting])
@@ -71,7 +80,7 @@ class DashboardView(views.generic.FormView):
 
     def get_context_data(self, **kwargs):
         context = super(DashboardView, self).get_context_data(**kwargs)
-        context['data_settings'] = models.DataSettings.objects.all()
+        context['data_settings'] = DataSettings.objects.all()
         context['plots'] = {}
 
         # Get scores + symbol
@@ -81,11 +90,11 @@ class DashboardView(views.generic.FormView):
                           'security__portfolio__shares',
                           'security__portfolio__allocation']
 
-        scores_fields = [field.name for field in models.Scores._meta.get_fields()]
+        scores_fields = [field.name for field in Scores._meta.get_fields()]
         scores_fields += related_fields
 
         # Only most recent
-        scores = models.Scores.objects.values(*scores_fields)
+        scores = Scores.objects.values(*scores_fields)
 
         if scores.exists():
             # context['plots'] = plots.create_plots()
@@ -93,7 +102,7 @@ class DashboardView(views.generic.FormView):
             context['plots']['spx'] = plots.compare_ytd()
 
             # Round decimals
-            field_dat = models.Scores._meta.get_fields() + models.Portfolio._meta.get_fields()
+            field_dat = Scores._meta.get_fields() + Portfolio._meta.get_fields()
             decimal_fields = [x.name for x in field_dat if x.get_internal_type() == 'DecimalField']
 
             # Formatting
@@ -105,6 +114,7 @@ class DashboardView(views.generic.FormView):
             df_scores = df_scores.sort_values(['allocation', 'symbol', 'date', 'pf_score'],
                                               ascending=False).reset_index(drop=True)
 
+            
             df_scores.allocation = round(100 * df_scores.allocation.astype(float), 2).astype(str) + "%"
             df_scores = df_scores.round({x: 3 for x in decimal_fields})
             df_scores.cash = '$' + (df_scores.cash / 1e6).astype(str) + 'm'
@@ -119,16 +129,16 @@ class DashboardView(views.generic.FormView):
 
         return context
 
-class AddDataView(views.generic.FormView):
-    model = models.Scores
-    form_class = forms.AddDataForm
+class AddDataView(FormView):
+    model = Scores
+    form_class = AddDataForm
     template_name = 'optimizer/add-data.html'
     success_url = reverse_lazy('add-data')
     snp_list = utils.get_latest_snp()
     snp_tickers = [x['Symbol'] for x in snp_list]
 
     def form_valid(self, form):
-        if not models.DataSettings.objects.exists() or not self.request.user.is_authenticated:
+        if not DataSettings.objects.exists() or not self.request.user.is_authenticated:
             return HttpResponseRedirect(reverse_lazy('add-data'))
 
         symbol_fieldval = form.cleaned_data['symbols']
@@ -169,7 +179,7 @@ class AddDataView(views.generic.FormView):
         context = super(AddDataView, self).get_context_data(**kwargs)
 
         # Get list of snp data
-        df_tickers = models.SecurityList.objects.filter(symbol__in=self.snp_tickers)
+        df_tickers = SecurityList.objects.filter(symbol__in=self.snp_tickers)
         df_tickers = df_tickers.values('symbol', 'last_updated', 'first_created')
         df_tickers = pd.DataFrame(df_tickers)
 
@@ -190,19 +200,19 @@ class AddDataView(views.generic.FormView):
         snp_data = snp_data.sort_values(['last_updated', 'symbol'])
 
         # Default data settings
-        if not models.DataSettings.objects.exists():
-            data_settings = models.DataSettings(
+        if not DataSettings.objects.exists():
+            data_settings = DataSettings(
                 start_date=datetime.date(2010, 1, 1),
                 investment_amount=10000
             )
             data_settings.save()
 
         context['snp_list'] = snp_data.to_dict('records')
-        context['data_settings'] = models.DataSettings.objects.values('start_date').first()
+        context['data_settings'] = DataSettings.objects.values('start_date').first()
 
         return context
 
 
 class DataSettingsSerializerView(viewsets.ModelViewSet):
-    serializer_class = serializers.DataSettingsSerializer
-    queryset = models.DataSettings.objects.all()
+    serializer_class = DataSettingsSerializer
+    queryset = DataSettings.objects.all()

@@ -1,4 +1,5 @@
-from ..webframe import models
+
+from ..models import Fundamentals, Scores
 from django.db.models import Q
 from datetime import datetime
 
@@ -34,7 +35,7 @@ class GetFscore:
 
     def __init__(self, fundamentals_df=None):
 
-        if fundamentals_df is None and models.Fundamentals.objects.exists():
+        if fundamentals_df is None and Fundamentals.objects.exists():
             self.data = self.get_data()
         else:
             self.data = fundamentals_df
@@ -43,7 +44,7 @@ class GetFscore:
         # self.save_scores()
 
     def get_data(self):
-        data = pd.DataFrame(models.Fundamentals.objects.all().values()).drop(columns='id')
+        data = pd.DataFrame(Fundamentals.objects.all().values()).drop(columns='id')
         float_cols = list(set(data.columns).difference(['security_id', 'date']))
         data[float_cols] = data[float_cols].astype(float)
 
@@ -76,6 +77,7 @@ class GetFscore:
     def calc_scores(self):
         df_measures = []
 
+        assert self.data is not None
         for _, df in self.data.groupby('security_id'):
             df = df.sort_values('date', ascending=False)
 
@@ -169,7 +171,7 @@ class GetFscore:
         new_scores = new_scores.replace([np.NaN, np.inf, -np.inf], None)
 
         # Check for existing scores in DB
-        old_scores = models.Scores.objects.filter(
+        old_scores = Scores.objects.filter(
                 Q(security_id__in=new_scores['security_id']) &
                 Q(date__in=new_scores['date'])
             ).values('id', 'security_id', 'date')
@@ -189,18 +191,18 @@ class GetFscore:
             # Grab the actual queryset to preserve pk
             old_scores_update = []
             for score in old_scores:
-                score_set = models.Scores.objects.get(id=score['id'])
+                score_set = Scores.objects.get(id=score['id'])
                 for k, v in score.items():
                     setattr(score_set, k, v)
                 old_scores_update.append(score_set)
 
-            models.Scores.objects.bulk_update(
+            Scores.objects.bulk_update(
                 old_scores_update,
                 #old_scores.to_dict('records'),
                 fields=list(new_scores.columns)
             )
 
-        models.Scores.objects.bulk_create(
-            models.Scores(**vals) for vals in new_scores.to_dict('records')
+        Scores.objects.bulk_create(
+            Scores(**vals) for vals in new_scores.to_dict('records')
         )
 

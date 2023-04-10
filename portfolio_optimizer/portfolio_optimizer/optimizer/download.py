@@ -1,6 +1,6 @@
 
 from django.db.models import Q
-from ..webframe import models
+from ..models import Fundamentals, SecurityPrice, SecurityList, Portfolio, Scores
 from ..optimizer import utils, piotroski_fscore, optimization
 import pandas as pd
 import yahooquery as yq
@@ -25,10 +25,10 @@ class DownloadCompanyData:
 
         self.end_date = datetime.date.today().strftime("%Y-%m-%d")
         self.DB_ref = {
-            'fundamentals': models.Fundamentals,
-            'securityprice': models.SecurityPrice,
-            'scores': models.Scores,
-            'portfolio': models.Portfolio
+            'fundamentals': Fundamentals,
+            'securityprice': SecurityPrice,
+            'scores': Scores,
+            'portfolio': Portfolio
             }
 
         # Download
@@ -57,7 +57,7 @@ class DownloadCompanyData:
 
             # 4) Filter out stock picks by score threshold. Keep any that ever exceed it (for backtesting)
             max_ticker_scores = (PFScores.scores.pf_score > self.score_cutoff).groupby('symbol').any()
-            price_tickers = max_ticker_scores[max_ticker_scores >= self.score_cutoff].index
+            price_tickers = max_ticker_scores[max_ticker_scores].index
 
             # Add out of date prices to update, remove duplicates
             ood_tickers['securityprice'].extend(price_tickers)
@@ -156,13 +156,13 @@ class DownloadCompanyData:
 
     def set_meta(self, meta):
         # Compare current meta data to see if any are incomplete entries (i.e., new)
-        incomplete_ids = [k for k, v in models.SecurityList.objects.values_list('symbol', 'sector') if v is None]
+        incomplete_ids = [k for k, v in SecurityList.objects.values_list('symbol', 'sector') if v is None]
         incomplete_ids = list(set(meta.symbol).intersection(incomplete_ids))
         # incomplete_ids = list(set(self.the_tickers).intersection(incomplete_ids))
 
         if incomplete_ids:
             # Get "concrete" fields (not relation field)
-            meta_fields = [f.name for f in models.SecurityList._meta.get_fields() if f.concrete]
+            meta_fields = [f.name for f in SecurityList._meta.get_fields() if f.concrete]
 
             # Exclude other specific fields
             exclude = ['id', 'security', 'last_updated', 'first_created', 'has_fundamentals', 'has_securityprice']
@@ -185,7 +185,7 @@ class DownloadCompanyData:
                 meta_iter = zip(meta.pk, meta[meta_fields].to_dict(orient='records'))
 
                 for key, values_dict in meta_iter:
-                    _meta = models.SecurityList.objects.get(id=key)
+                    _meta = SecurityList.objects.get(id=key)
 
                     for field, value in values_dict.items():
                         setattr(_meta, field, value)
@@ -193,7 +193,7 @@ class DownloadCompanyData:
                     meta_bulk_update_list.append(_meta)
 
                 # Bulk update
-                models.SecurityList.objects.bulk_update(meta_bulk_update_list, meta_fields)
+                SecurityList.objects.bulk_update(meta_bulk_update_list, meta_fields)
 
         else:
             print('Meta data already up to date')

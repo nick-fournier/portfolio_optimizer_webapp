@@ -8,9 +8,11 @@
 
 """
 
-from ..webframe import models
+from ..models import SecurityList, Scores, SecurityPrice, Portfolio
+from ..optimizer.piotroski_fscore import GetFscore
+
+
 from django.db.models import Q, Max, OuterRef, Subquery
-from . import piotroski_fscore
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
@@ -37,18 +39,18 @@ def get_analysis_data():
                   'delta_current_lev_ratio', 'delta_shares', 'delta_gross_margin', 'delta_asset_turnover']
 
     # financials = models.Fundamentals.objects.all().values('security_id', 'date')
-    prices_qry = models.SecurityPrice.objects.all().values('security_id', 'date', 'close')
-    scores_qry = models.Scores.objects.all().values(*score_cols)
+    prices_qry = SecurityPrice.objects.all().values('security_id', 'date', 'close')
+    scores_qry = Scores.objects.all().values(*score_cols)
 
     # As dataframe
     # financials = pd.DataFrame(financials)
     prices = pd.DataFrame(prices_qry)
     df = pd.DataFrame(scores_qry).rename(columns={'security__fundamentals__fiscal_year': 'year'})
 
-    pd.DataFrame(models.Scores.objects.all().values('security_id', 'date', 'security__fundamentals__fiscal_year'))
+    pd.DataFrame(Scores.objects.all().values('security_id', 'date', 'security__fundamentals__fiscal_year'))
 
     # update scores
-    # pfobject = piotroski_fscore.GetFscore()
+    # pfobject = GetFscore()
     # pfobject.save_scores()
 
     # Aggregate price data annually
@@ -159,7 +161,8 @@ class OptimizePorfolio:
     def optimize(self, expected_returns, investment_amount=10000, threshold=6, objective='max_sharpe', l2_gamma=2):
 
         # Check type
-        investment_amount = float(investment_amount)
+        
+        investment_amount = int(investment_amount)
 
         # # Forecast expected returns
         returns_df = expected_returns[~expected_returns.isna()]
@@ -168,15 +171,15 @@ class OptimizePorfolio:
         returns_ids = returns_df.index.get_level_values('security_id').unique()
 
         # Find company IDs above threshold for current year and has forecasted return data available
-        sq = models.Scores.objects.filter(security_id=OuterRef('security_id')).order_by('-fiscal_year')
+        sq = Scores.objects.filter(security_id=OuterRef('security_id')).order_by('-fiscal_year')
         security_ids = list(
-            models.Scores.objects.filter(
+            Scores.objects.filter(
                 Q(pk=Subquery(sq.values('pk')[:1])) & Q(pf_score__gte=threshold) & Q(security_id__in=returns_ids)
             ).values_list('security_id', flat=True)
         )
 
         # Some formatting
-        prices = models.SecurityPrice.objects.filter(security_id__in=security_ids)
+        prices = SecurityPrice.objects.filter(security_id__in=security_ids)
         prices = pd.DataFrame(prices.values('security_id', 'date', 'close'))
         prices.date = pd.to_datetime(prices.date)
         prices['year'] = prices.date.dt.year
@@ -223,6 +226,7 @@ class OptimizePorfolio:
         latest_weights = weights_dict[portfolio_year]
         # Only do this for current year. Everything prior can be unitless
         latest_prices = prices.loc[prices.groupby('security_id').date.idxmax()].set_index('security_id')
+        
         disc_allocation, cash = DiscreteAllocation(latest_weights,
                                                    latest_prices.close,
                                                    total_portfolio_value=investment_amount,
@@ -238,7 +242,9 @@ class OptimizePorfolio:
         df_allocation = df_allocation.fillna(0)
 
         # Reindex for all 0% stocks
-        all_security_ids = models.SecurityList.objects.all().values_list('pk', flat=True)
+        all_security_ids = SecurityList.objects.all().values_list('pk', flat=True)
+        
+        assert all_security_ids is not None
         df_allocation = df_allocation.set_index('security_id').reindex(all_security_ids).fillna(0).reset_index()
 
         # Add allocation year
@@ -249,10 +255,11 @@ class OptimizePorfolio:
     def save_portfolio(self):
         # Send to database
         if not self.portfolio.empty:
-            if models.Portfolio.objects.exists():
-                models.Portfolio.objects.all().delete()
-            models.Portfolio.objects.bulk_create(
-                models.Portfolio(**vals) for vals in self.portfolio.to_dict('records')
+            if Portfolio.objects.exists():
+                Portfolio.objects.all().delete()
+                
+            Portfolio.objects.bulk_create(
+                Portfolio(**vals) for vals in self.portfolio.to_dict('records')
             )
 
 

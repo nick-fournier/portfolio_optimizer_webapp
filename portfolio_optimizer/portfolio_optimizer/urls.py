@@ -1,6 +1,5 @@
 # users/urls.py
 
-
 from .views import index, AddDataView, DashboardView, DataSettingsSerializerView
 from django.urls import path, include
 from rest_framework import routers

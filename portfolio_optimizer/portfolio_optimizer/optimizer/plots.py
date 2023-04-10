@@ -1,7 +1,7 @@
-import pandas as pd
 
-from ..webframe import models
-from . import optimization, download
+from ..models import Portfolio, SecurityPrice
+from ..optimizer import optimization, download
+import pandas as pd
 from io import BytesIO
 import base64
 
@@ -16,7 +16,7 @@ def calc_yield():
 
 def compare_ytd():
     # Get portfolio
-    portfolio_qry = models.Portfolio.objects.filter(allocation__gt=0)
+    portfolio_qry = Portfolio.objects.filter(allocation__gt=0)
     portfolio_df = pd.DataFrame(portfolio_qry.values('security_id', 'security__symbol', 'allocation'))
 
     if portfolio_df.empty:
@@ -29,7 +29,7 @@ def compare_ytd():
     download.DownloadCompanyData(symbol_list)
 
     # Get price data
-    prices_qry = models.SecurityPrice.objects.filter(security__symbol__in=symbol_list)
+    prices_qry = SecurityPrice.objects.filter(security__symbol__in=symbol_list)
     prices_df = pd.DataFrame(prices_qry.values('security_id', 'security__symbol', 'date', 'close'))
 
     # calculate yield as % change since t=0
@@ -47,6 +47,7 @@ def compare_ytd():
 
     # dot product of yield and weight, sort columns to match the weight vector
     folio_prices = prices_wide[portfolio_df.security__symbol].dot(w)
+    assert isinstance(folio_prices, pd.Series)
 
     # SP500 Index
     SPX_prices = prices_wide['^GSPC']

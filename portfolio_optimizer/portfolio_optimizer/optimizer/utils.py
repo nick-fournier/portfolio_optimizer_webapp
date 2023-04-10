@@ -7,23 +7,24 @@ from django.utils.timezone import utc
 from urllib import request
 from itertools import islice
 from django.db.models import Q, Max, Count, OuterRef, Subquery
-from ..webframe import models
+
+from ..models import SecurityList, Fundamentals, SecurityPrice
 
 
 THIS_PATH = os.path.dirname(__file__)
 
 def get_id_table(tickers, add_missing=False):
     # if missing from security list, add it
-    in_db = models.SecurityList.objects.filter(symbol__in=tickers).values_list('symbol', flat=True)
+    in_db = SecurityList.objects.filter(symbol__in=tickers).values_list('symbol', flat=True)
     not_in_db = list(set(tickers) - set(in_db))
 
     if not_in_db and add_missing:
-        models.SecurityList.objects.bulk_create(
-            models.SecurityList(**{'symbol': vals}) for vals in missing
+        SecurityList.objects.bulk_create(
+            SecurityList(**{'symbol': vals}) for vals in not_in_db
         )
 
     # Make id table either way
-    query = models.SecurityList.objects.filter(symbol__in=tickers).values('id', 'symbol')
+    query = SecurityList.objects.filter(symbol__in=tickers).values('id', 'symbol')
     id_table = pd.DataFrame(query).rename(columns={'id': 'security_id'})
     return id_table
 
@@ -42,7 +43,7 @@ def get_missing(
     current_year = now.year
 
     # tickers in db of proposed ones
-    in_db =  models.SecurityList.objects.filter(symbol__in=proposed_tickers)
+    in_db =  SecurityList.objects.filter(symbol__in=proposed_tickers)
 
     # First find ones that are out of date
     ood_all = in_db.filter(
@@ -54,7 +55,6 @@ def get_missing(
 
     # Find ones that aren't in database at all
     not_in_db = set(proposed_tickers) - set(in_db.values_list('symbol', flat=True))
-        
     ood_tickers = {'meta': [], 'fundamentals': [], 'securityprice': []}
 
     # If nothing to update, exit
@@ -62,26 +62,35 @@ def get_missing(
         return ood_tickers
 
     if ood_all:
+        
         # Then find any out of date meta data records
-        ood_tickers['metas'] = models.SecurityList.objects.filter(Q(symbol__in=ood_all) & Q(last_updated__lt=price_lapse_date))
+        meta_list = SecurityList.objects\
+            .filter(Q(symbol__in=ood_all) & Q(last_updated__lt=price_lapse_date))\
+            .values_list('security__symbol', flat=True)
+        
+        assert isinstance(meta_list, list)
+        
+        ood_tickers['meta'] = meta_list
 
         # Find any out of date fundamentals
-        sq = models.Fundamentals.objects.filter(security_id=OuterRef('security_id')).order_by('-fiscal_year')
+        sq = Fundamentals.objects.filter(security_id=OuterRef('security_id')).order_by('-fiscal_year')
         ood_tickers['fundamentals'] = list(
-            models.Fundamentals.objects.filter(
+            Fundamentals.objects.filter(
                 Q(pk=Subquery(sq.values('pk')[:1])) & Q(security__symbol__in=ood_all) & Q(fiscal_year__lt=current_year)
             ).values_list('security__symbol', flat=True)
         )
 
         # Find any out of date price records
-        sq = models.SecurityPrice.objects.filter(security_id=OuterRef('security_id')).order_by('-date')
+        sq = SecurityPrice.objects.filter(security_id=OuterRef('security_id')).order_by('-date')
         ood_tickers['securityprice'] = list(
-            models.SecurityPrice.objects.filter(
+            SecurityPrice.objects.filter(
                 Q(pk=Subquery(sq.values('pk')[:1])) & Q(security__symbol__in=ood_all) & Q(date__lt=price_lapse_date)
             ).values_list('security__symbol', flat=True)
         )
 
     # Add outright missing to out of date tickers
+    assert isinstance(not_in_db, list)
+    
     ood_tickers = {k: v + not_in_db for k, v in ood_tickers.items()}
 
     return ood_tickers
@@ -91,11 +100,11 @@ def clean_records(DB_ref_dict=None):
     # DB Reference dict
     if DB_ref_dict is None:
         DB_ref_dict = {
-            'fundamentals': models.Fundamentals,
-            'securityprice': models.SecurityPrice,
+            'fundamentals': Fundamentals,
+            'securityprice': SecurityPrice,
         }
 
-    security_ids = models.SecurityList.objects.values_list('id', flat=True)
+    security_ids = SecurityList.objects.all().values_list('id', flat=True)
 
     # Finds any IDs that are not completely shared, fully mutually inclusive.
     incomplete_records = []
@@ -134,8 +143,8 @@ def clean_records(DB_ref_dict=None):
 
     # Update security list to indicate if it has fundamentals and/or prices
     for field, has_ids in has_records.items():
-        SecurityList = models.SecurityList.objects.filter(id__in=has_ids)
-        SecurityList.update(**{field: True})
+        DB = SecurityList.objects.filter(id__in=has_ids)
+        DB.update(**{field: True})
 
     # # Find incomplete records and remove
     # if incomplete_records:

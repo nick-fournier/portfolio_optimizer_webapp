@@ -3,7 +3,8 @@ from django.core import validators
 from django.forms import ModelForm
 from django.forms.widgets import DateInput
 
-from ..webframe import models
+
+from .models import DataSettings
 
 from django.db.utils import OperationalError
 import datetime
@@ -28,6 +29,7 @@ class CommaSeparatedCharField(forms.Field):
         if value in validators.EMPTY_VALUES:
             return []
 
+        assert value is not None
         value = [item.strip() for item in value.split(',') if item.strip()]
 
         if self.dedup:
@@ -52,7 +54,7 @@ class CommaSeparatedCharField(forms.Field):
 
 class OptimizeForm(forms.ModelForm):
     class Meta:
-        model = models.DataSettings
+        model = DataSettings
         fields = ['investment_amount',
                   'FScore_threshold',
                   'objective',
@@ -68,13 +70,13 @@ class AddDataForm(forms.Form):
 
 class DataSettingsForm(ModelForm):
     try:
-        start_date = models.DataSettings.objects.first()
+        start_date = DataSettings.objects.first()
     except OperationalError:
         default_start_date = datetime.date.today() - datetime.timedelta(days=365)
         start_date = forms.DateField(initial=default_start_date)
 
     class Meta:
-        model = models.DataSettings
+        model = DataSettings
         fields = ['start_date']
         widgets = {
             'start_date': DateInput(attrs={'type': 'date'}),
