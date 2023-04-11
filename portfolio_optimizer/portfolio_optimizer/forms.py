@@ -68,16 +68,16 @@ class MultipleForm(forms.Form):
 class AddDataForm(forms.Form):
     symbols = CommaSeparatedCharField()
 
-class DataSettingsForm(ModelForm):
-    try:
-        start_date = DataSettings.objects.first()
-    except OperationalError:
-        default_start_date = datetime.date.today() - datetime.timedelta(days=365)
-        start_date = forms.DateField(initial=default_start_date)
+# class DataSettingsForm(ModelForm):
+#     try:
+#         start_date = DataSettings.objects.first()
+#     except OperationalError:
+#         default_start_date = datetime.date.today() - datetime.timedelta(days=365)
+#         start_date = forms.DateField(initial=default_start_date)
 
-    class Meta:
-        model = DataSettings
-        fields = ['start_date']
-        widgets = {
-            'start_date': DateInput(attrs={'type': 'date'}),
-        }
+#     class Meta:
+#         model = DataSettings
+#         fields = ['start_date']
+#         widgets = {
+#             'start_date': DateInput(attrs={'type': 'date'}),
+#         }
