@@ -1,13 +1,20 @@
-# Portfolio Optimizer
+# portfolio_optimizer
 
-This repo is a Django website for the portfolio optimization platform. Django is a python-based web framework with built-in database management API. This will help us efficiently store stock/financial data into a cloud database, but be able to easily access it using python and run whatever analysis we want. The results can then be stored and presented on this web platform.
+This app provides a simple stock filter using Piotroski F-scores and performs mean-variance portfolio optimization.
 
-So far this just has a basic home page with a simple login/logout/reset password functionality. Next I want to connect it to a database like postgreSQL. https://www.heroku.com/ has a lot of built in support for django and postgres already, and you can just deploy updates through git directly to it. Eventually I want to try hosting something there.
+Quick start
+-----------
 
-I created a folder called optimizer within the Django folder where we can place whatever python code we want. Django can then import those using the python module system and run them. I made a couple empty files for things I think we'd need:
+1. Add "portfolio_optimizer" to your INSTALLED_APPS setting like this::
 
-1. an API script to download the latest stock data, 
-2. a preprocessing algorithm for whatever data cleanup steps necessary, 
-3. a prediction/forecasting model that predicts the potential return and risk, and 
-4. an optimization step that optimizes the portfolio based on risk and potential return.
+    INSTALLED_APPS = [
+        ...
+        'portfolio_optimizer.webframe',
+    ]
 
+2. Include the portfolio_optimizer URLconf in your project urls.py like this:
+    path('portfolio_optimizer/', include('portfolio_optimizer.webframe.urls')),
+
+3. Run ``python manage.py migrate`` to create the polls models.
+
+4. Start the development server with `python manage.py runserver` and visit http://127.0.0.1:8000/admin/.
