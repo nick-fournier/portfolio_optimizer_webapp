@@ -5,9 +5,10 @@ from django.urls import reverse_lazy
 from django.http import HttpResponseRedirect
 from django.db.models import Max, Subquery, OuterRef
 from django.db import connection
+from django.conf import settings
 
 from django.views.generic.edit import FormView
-from django import views
+from django.views.generic.base import TemplateView
 from django.shortcuts import render
 from rest_framework import viewsets
 
@@ -18,18 +19,32 @@ from .serializers import DataSettingsSerializer
 
 import datetime
 import pandas as pd
+import markdown as md
 import json
 import random
 import re
-
+import os
 
 # Create your views here.
-def index(request):
-    return render(request, "optimizer/index.html")
+# def index(request):
+#     return render(request, "optimizer/index.html")
 
+
+class IndexView(TemplateView):
+    template_name = 'optimizer/index.html'
+    template_path = os.path.join(settings.BASE_DIR, 'templates', 'index.md')
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        with open(self.template_path, 'r') as f:
+            text = f.read()
+            context["about"] = md.markdown(text)
+            
+        return context
+    
 # uvicorn config.asgi:application --reload
 
-# class DashboardView(views.generic.ListView):
 class DashboardView(FormView):
     model = Scores
     form_class = OptimizeForm

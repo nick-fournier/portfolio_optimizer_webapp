@@ -3,7 +3,11 @@
 {% extends 'optimizer/base.html' %}
 
 {% block content %}
-{#Hello, {{ user.username|default: 'Guest' }}!#}
-Hello {{ user.username | default:'Guest' }}
+{% comment %} Hello {{ user.username | default:'Guest' }} {% endcomment %}
+
+
+<div class="container">
+{{about | safe}}
+</div>
 
 {% endblock %}

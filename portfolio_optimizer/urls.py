@@ -1,6 +1,6 @@
 # users/urls.py
 
-from .views import index, AddDataView, DashboardView, DataSettingsSerializerView
+from .views import IndexView, AddDataView, DashboardView, DataSettingsSerializerView
 from django.urls import path, include
 from rest_framework import routers
 
@@ -8,7 +8,8 @@ router = routers.DefaultRouter()
 router.register(r'data-settings/1', DataSettingsSerializerView, 'data-settings')
 
 urlpatterns = [
-    path('', index, name='index'),
+    # path('', index, name='index'),
+    path('', IndexView.as_view(), name='index'),
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
     path('add-data/', AddDataView.as_view(), name='add-data'),
     # path('dashboard/add-data/', AddDataView.as_view(), name='add-data'),
