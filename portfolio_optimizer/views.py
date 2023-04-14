@@ -32,8 +32,7 @@ import os
 
 class IndexView(TemplateView):
     template_name = 'optimizer/index.html'
-    template_path = 'index.md'
-    # template_path = os.path.join(settings.BASE_DIR, 'templates', 'index.md')
+    template_path = os.path.join(settings.BASE_DIR, 'templates/optimizer/index.md')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
