@@ -24,6 +24,7 @@ import json
 import random
 import re
 import os
+from pathlib import Path
 
 # Create your views here.
 # def index(request):
@@ -32,7 +33,8 @@ import os
 
 class IndexView(TemplateView):
     template_name = 'optimizer/index.html'
-    template_path = os.path.join(settings.BASE_DIR, 'templates/optimizer/index.md')
+    # template_path = os.path.join(settings.BASE_DIR, 'templates/optimizer/index.md')
+    template_path = Path(__file__).resolve().parent / 'templates/optimizer/index.md'
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
