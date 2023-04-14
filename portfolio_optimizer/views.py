@@ -23,7 +23,6 @@ import markdown as md
 import json
 import random
 import re
-import os
 from pathlib import Path
 
 # Create your views here.
