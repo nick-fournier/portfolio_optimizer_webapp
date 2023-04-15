@@ -54,7 +54,9 @@ def get_missing(
 
 
     # Find ones that aren't in database at all
-    not_in_db = set(proposed_tickers) - set(in_db.values_list('symbol', flat=True))
+    not_in_db = list(
+        set(proposed_tickers) - set(in_db.values_list('symbol', flat=True))
+    )
     ood_tickers = {'meta': [], 'fundamentals': [], 'securityprice': []}
 
     # If nothing to update, exit
