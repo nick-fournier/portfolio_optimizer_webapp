@@ -1,13 +1,12 @@
 # Portfolio Optimizer
 
-This repo is a Django website for the portfolio optimization platform. Django is a python-based web framework with built-in database management API. This will help us efficiently store stock/financial data into a cloud database, but be able to easily access it using python and run whatever analysis we want. The results can then be stored and presented on this web platform.
+This is my attempt at making a crude stock portfolio and optimizing it. 
 
-So far this just has a basic home page with a simple login/logout/reset password functionality. Next I want to connect it to a database like postgreSQL. https://www.heroku.com/ has a lot of built in support for django and postgres already, and you can just deploy updates through git directly to it. Eventually I want to try hosting something there.
+## How it works?
+In general it is a "value investing" type of approach where you hold the stocks for at least a year. I could tighten the timeframe to quarterly, but company fundamental data are difficult to get for more than a year at that time period. 
 
-I created a folder called optimizer within the Django folder where we can place whatever python code we want. Django can then import those using the python module system and run them. I made a couple empty files for things I think we'd need:
+I use company fundamentals to calculate and filter stocks using a [Piotroski F-Score](https://en.wikipedia.org/wiki/Piotroski_F-score). I then optimize the selected stocks in the portfolio using the [efficient frontier](https://en.wikipedia.org/wiki/Efficient_frontier) method of modern portoflio theory. The expected returns are estimated using a very crude autoregressive model using the same key fundamentals for calculating the Piotroski F-Score as features. 
 
-1. an API script to download the latest stock data, 
-2. a preprocessing algorithm for whatever data cleanup steps necessary, 
-3. a prediction/forecasting model that predicts the potential return and risk, and 
-4. an optimization step that optimizes the portfolio based on risk and potential return.
 
+## Tech stack
+It created entirely in Django, a python-based web framework with built-in database management. Primarily, I use [yahooquery](https://yahooquery.dpguthrie.com/) to scrape financial data from Yahoo Finance and [pyportfolioopt](https://pyportfolioopt.readthedocs.io/en/latest/).
