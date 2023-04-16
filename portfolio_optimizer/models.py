@@ -7,6 +7,18 @@ import pandas as pd
 #  Or at least convert int to IntegerFields. May cause issue with NAs?
 # TODO user-specific entries?
 
+def get_fiscal_year(date):
+    assert date
+    # Add fiscal year
+    the_date = pd.to_datetime(date)
+    fy_dates = {x: pd.to_datetime(f"{x}-12-31") for x in range(the_date.year - 1, datetime.date.today().year)}
+    # get all differences with date as values
+    cloz_dict = {abs(the_date.timestamp() - fydate.timestamp()): yr for yr, fydate in fy_dates.items()}
+    # extracting minimum key using min()
+    result = cloz_dict[min(cloz_dict.keys())]
+    return result
+
+
 class DataSettings(models.Model):
     OBJ_CHOICES = [
         ('max_sharpe', 'Maximum Sharpe Ratio'),
@@ -72,18 +84,8 @@ class Scores(models.Model):
     # yearly_close = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     # yearly_variance = models.DecimalField(max_digits=17, null=True, decimal_places=2)
 
-    def get_fiscal_year(self):
-        # Add fiscal year
-        the_date = pd.to_datetime(self.date)
-        fy_dates = {x: pd.to_datetime(f"{x}-12-31") for x in range(the_date.year - 1, datetime.date.today().year)}
-        # get all differences with date as values
-        cloz_dict = {abs(the_date.timestamp() - fydate.timestamp()): yr for yr, fydate in fy_dates.items()}
-        # extracting minimum key using min()
-        result = cloz_dict[min(cloz_dict.keys())]
-        return result
-
     def save(self, *args, **kwargs):
-        self.fiscal_year = self.get_fiscal_year()
+        self.fiscal_year = get_fiscal_year(self.date)
         super(Scores, self).save(*args, **kwargs)
 
 class SecurityPrice(models.Model):
@@ -103,27 +105,17 @@ class Fundamentals(models.Model):
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
     date = models.DateField(null=True)
     fiscal_year = models.IntegerField(default=None, null=True)
-    net_income = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-    net_income_common_stockholders = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-    total_liabilities = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-    total_assets = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-    current_assets = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-    current_liabilities = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-    shares_outstanding = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-    cash = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-    gross_profit = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-    total_revenue = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-
-    def get_fiscal_year(self):
-        # Add fiscal year
-        the_date = pd.to_datetime(self.date)
-        fy_dates = {x: pd.to_datetime(f"{x}-12-31") for x in range(the_date.year - 1, datetime.date.today().year)}
-        # get all differences with date as values
-        cloz_dict = {abs(the_date.timestamp() - fydate.timestamp()): yr for yr, fydate in fy_dates.items()}
-        # extracting minimum key using min()
-        result = cloz_dict[min(cloz_dict.keys())]
-        return result
+    net_income = models.IntegerField(default=None, null=True)
+    net_income_common_stockholders = models.IntegerField(default=None, null=True)
+    total_liabilities = models.IntegerField(default=None, null=True)
+    total_assets = models.IntegerField(default=None, null=True)
+    current_assets = models.IntegerField(default=None, null=True)
+    current_liabilities = models.IntegerField(default=None, null=True)
+    shares_outstanding = models.IntegerField(default=None, null=True)
+    cash = models.IntegerField(default=None, null=True)
+    gross_profit = models.IntegerField(default=None, null=True)
+    total_revenue = models.IntegerField(default=None, null=True)
 
     def save(self, *args, **kwargs):
-        self.fiscal_year = self.get_fiscal_year()
+        self.fiscal_year = get_fiscal_year(self.date)
         super(Fundamentals, self).save(*args, **kwargs)
