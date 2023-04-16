@@ -59,7 +59,8 @@ class OptimizeForm(forms.ModelForm):
                   'FScore_threshold',
                   'objective',
                   'estimation_method',
-                  'l2_gamma']
+                  'l2_gamma',
+                  'risk_aversion']
 
 
 class MultipleForm(forms.Form):

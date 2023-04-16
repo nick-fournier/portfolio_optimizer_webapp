@@ -80,20 +80,25 @@ class OptimizePorfolio:
                  objective='max_sharpe',
                  method='nn',
                  l2_gamma=2,
+                 risk_aversion=1,
                  backcast=False
                  ):
+        
+        
+        self.investment_amount = investment_amount
+        self.threshold = threshold
+        self.objective = objective
+        self.method = method
+        self.l2_gamma = l2_gamma
+        self.risk_aversion = risk_aversion
+        self.backcast = backcast
+        
         data = get_analysis_data()
-        expected_returns = self.forecast_expected_returns(data, backcast=backcast, method=method)
-        self.portfolio = self.optimize(
-            expected_returns=expected_returns,
-            investment_amount=investment_amount,
-            threshold=threshold,
-            objective=objective,
-            l2_gamma=l2_gamma
-        )
+        expected_returns = self.forecast_expected_returns(data)
+        self.portfolio = self.optimize(expected_returns=expected_returns)
         # self.save_portfolio()
 
-    def forecast_expected_returns(self, company_df, backcast=False, method='nn'):
+    def forecast_expected_returns(self, company_df):
 
         x_cols = ['roa', 'cash_ratio', 'delta_cash', 'delta_roa', 'accruals', 'delta_long_lev_ratio',
                   'delta_current_lev_ratio', 'delta_shares', 'delta_gross_margin', 'delta_asset_turnover']
@@ -120,7 +125,7 @@ class OptimizePorfolio:
         # Initalize DF to join to
         i = model_df.fy.min() + 1
 
-        if not backcast:
+        if not self.backcast:
             i = model_df.fy.max()
 
         while i <= model_df.fy.max():
@@ -136,7 +141,7 @@ class OptimizePorfolio:
             x = df_t[x_cols].astype(float)#.to_numpy()
 
             # Estimate model
-            if method == 'nn':
+            if self.method == 'nn':
                 model = MLPRegressor(max_iter=1000).fit(x, y)
             else:
                 model = LinearRegression().fit(x, y)
@@ -158,11 +163,11 @@ class OptimizePorfolio:
 
         return expected_returns
 
-    def optimize(self, expected_returns, investment_amount=10000, threshold=6, objective='max_sharpe', l2_gamma=2):
+    def optimize(self, expected_returns):
 
         # Check type
         
-        investment_amount = int(investment_amount)
+        investment_amount = int(self.investment_amount)
 
         # # Forecast expected returns
         returns_df = expected_returns[~expected_returns.isna()]
@@ -174,7 +179,7 @@ class OptimizePorfolio:
         sq = Scores.objects.filter(security_id=OuterRef('security_id')).order_by('-fiscal_year')
         security_ids = list(
             Scores.objects.filter(
-                Q(pk=Subquery(sq.values('pk')[:1])) & Q(pf_score__gte=threshold) & Q(security_id__in=returns_ids)
+                Q(pk=Subquery(sq.values('pk')[:1])) & Q(pf_score__gte=self.threshold) & Q(security_id__in=returns_ids)
             ).values_list('security_id', flat=True)
         )
 
@@ -212,11 +217,13 @@ class OptimizePorfolio:
             # Optimize efficient frontier of Mean Variance
             ef = EfficientFrontier(exp_df.to_numpy(), prices_cov)
             # Reduces 0 weights
-            ef.add_objective(L2_reg, gamma=5)
+            ef.add_objective(L2_reg, gamma=self.l2_gamma)
 
             # Get the allocation weights
-            if objective == 'max_sharpe':
+            if self.objective == 'max_sharpe':
                 weights_dict[year] = ef.max_sharpe()
+            elif self.objective == 'max_quadratic_utility':
+                weights_dict[year] = ef.max_quadratic_utility(risk_aversion=self.risk_aversion)
             else:
                 weights_dict[year] = ef.min_volatility()
 
@@ -242,7 +249,7 @@ class OptimizePorfolio:
         df_allocation = df_allocation.fillna(0)
 
         # Reindex for all 0% stocks
-        all_security_ids = SecurityList.objects.all().values_list('pk', flat=True)
+        all_security_ids = list(SecurityList.objects.all().values_list('pk', flat=True))
         
         assert all_security_ids is not None
         df_allocation = df_allocation.set_index('security_id').reindex(all_security_ids).fillna(0).reset_index()
@@ -261,6 +268,8 @@ class OptimizePorfolio:
             Portfolio.objects.bulk_create(
                 Portfolio(**vals) for vals in self.portfolio.to_dict('records')
             )
+            
+        return
 
 
 

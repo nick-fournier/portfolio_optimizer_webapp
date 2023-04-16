@@ -76,6 +76,7 @@ class DashboardView(FormView):
         threshold = form.cleaned_data['FScore_threshold']
         method = form.cleaned_data['estimation_method']
         gamma = form.cleaned_data['l2_gamma']
+        risk_aversion = form.cleaned_data['risk_aversion']
 
         assert self.form_class is not None
 
@@ -88,7 +89,8 @@ class DashboardView(FormView):
             objective=objective,
             threshold=threshold,
             method=method,
-            l2_gamma=gamma
+            l2_gamma=gamma,
+            risk_aversion=risk_aversion
         )
         optimalPortfolio.save_portfolio()
 

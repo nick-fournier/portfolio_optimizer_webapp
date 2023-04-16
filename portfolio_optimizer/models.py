@@ -1,7 +1,8 @@
-import datetime
-
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db.models import CheckConstraint, Q
 from django.db import models
 import pandas as pd
+import datetime
 
 # TODO Clean up the data fields to be more efficent (e.g., divide by million, as int, etc.
 #  Or at least convert int to IntegerFields. May cause issue with NAs?
@@ -22,7 +23,8 @@ def get_fiscal_year(date):
 class DataSettings(models.Model):
     OBJ_CHOICES = [
         ('max_sharpe', 'Maximum Sharpe Ratio'),
-        ('min_volatility', 'Minimum Volatility')
+        ('min_volatility', 'Minimum Volatility'),
+        ('max_quadratic_utility', 'Maximum Quadratic Utility')
     ]
     ESTIMATION_CHOICES = [
         ('nn', 'Neural Net'),
@@ -32,9 +34,13 @@ class DataSettings(models.Model):
     start_date = models.DateField(default=datetime.date(2010, 1, 1))
     investment_amount = models.FloatField(default=10000)
     FScore_threshold = models.IntegerField(default=6)
-    objective = models.CharField(default='max_sharpe', choices=OBJ_CHOICES, max_length=16)
+    objective = models.CharField(default='max_sharpe', choices=OBJ_CHOICES, max_length=24)
     estimation_method = models.CharField(default='max_sharpe', choices=ESTIMATION_CHOICES, max_length=16)
     l2_gamma = models.FloatField(default=2)
+    risk_aversion = models.FloatField(
+        default=1,
+        validators=[MinValueValidator(0.01), MaxValueValidator(1.0)],
+        )
 
 
 class SecurityList(models.Model):
