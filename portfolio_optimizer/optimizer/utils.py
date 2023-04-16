@@ -40,60 +40,61 @@ def get_missing(
 
     meta_lapse_date = now - timedelta(days=meta_lapse_days)
     price_lapse_date = now - timedelta(days=prices_lapse_days)
-    current_year = now.year
+    current_year = now.year - 1
 
     # tickers in db of proposed ones
-    in_db =  SecurityList.objects.filter(symbol__in=proposed_tickers)
+    in_meta_db =  SecurityList.objects.filter(symbol__in=proposed_tickers).values_list('symbol', flat=True)
+    in_price_db = SecurityPrice.objects.filter(security__symbol__in=proposed_tickers).values_list('security__symbol', flat=True)
+    in_funda_db = Fundamentals.objects.filter(security__symbol__in=proposed_tickers).values_list('security__symbol', flat=True)  
 
     # First find ones that are out of date
-    ood_all = in_db.filter(
-        # Q(symbol__in=proposed_tickers) & # is in our target list
-        Q(last_updated__lte=meta_lapse_date) &  # is out of date
-        (Q(sector__isnull=False) | Q(symbol='^GSPC'))  # Is SP500 index and not a previous bad symbol call
-    ).values_list('symbol', flat=True)
+    # ood_all = SecurityList.objects.filter(
+    #     Q(symbol__in=proposed_tickers) & # is in our target list
+    #     Q(last_updated__lte=meta_lapse_date) &  # is out of date
+    #     (Q(sector__isnull=False) | Q(symbol='^GSPC'))  # Is SP500 index and not a previous bad symbol call
+    # ).values_list('symbol', flat=True)
 
-
+    # Get complete list. If symbol is missing from any, it won't be skipped
+    # in_db = in_meta_db.intersection(in_price_db).intersection(in_funda_db)
+    # ood_all = list(set(proposed_tickers) - set(in_db))
+    
     # Find ones that aren't in database at all
-    not_in_db = list(
-        set(proposed_tickers) - set(in_db.values_list('symbol', flat=True))
-    )
+    not_in_meta = list(set(proposed_tickers) - set(in_meta_db))
+    not_in_funda = list(set(proposed_tickers) - set(in_funda_db))
+    not_in_prices = list(set(proposed_tickers) - set(in_price_db))
+    # ood_all = list(ood_meta.union(ood_funda).union(ood_prices))    
+    
+    #    
     ood_tickers = {'meta': [], 'fundamentals': [], 'securityprice': []}
 
-    # If nothing to update, exit
-    if not ood_all and not not_in_db:
-        return ood_tickers
-
-    if ood_all:
-        
-        # Then find any out of date meta data records
-        meta_list = SecurityList.objects\
-            .filter(Q(symbol__in=ood_all) & Q(last_updated__lt=price_lapse_date))\
-            .values_list('security__symbol', flat=True)
-        
-        assert isinstance(meta_list, list)
-        
-        ood_tickers['meta'] = meta_list
-
-        # Find any out of date fundamentals
-        sq = Fundamentals.objects.filter(security_id=OuterRef('security_id')).order_by('-fiscal_year')
-        ood_tickers['fundamentals'] = list(
-            Fundamentals.objects.filter(
-                Q(pk=Subquery(sq.values('pk')[:1])) & Q(security__symbol__in=ood_all) & Q(fiscal_year__lt=current_year)
-            ).values_list('security__symbol', flat=True)
-        )
-
-        # Find any out of date price records
-        sq = SecurityPrice.objects.filter(security_id=OuterRef('security_id')).order_by('-date')
-        ood_tickers['securityprice'] = list(
-            SecurityPrice.objects.filter(
-                Q(pk=Subquery(sq.values('pk')[:1])) & Q(security__symbol__in=ood_all) & Q(date__lt=price_lapse_date)
-            ).values_list('security__symbol', flat=True)
-        )
-
-    # Add outright missing to out of date tickers
-    assert isinstance(not_in_db, list)
+    # Then find any out of date meta data records
+    meta_list = list(
+        SecurityList.objects\
+        .filter(Q(symbol__in=proposed_tickers) & Q(last_updated__lt=price_lapse_date))\
+        .values_list('symbol', flat=True)
+    )
+    assert isinstance(meta_list, list)
     
-    ood_tickers = {k: v + not_in_db for k, v in ood_tickers.items()}
+    ood_tickers['meta'] = meta_list + not_in_meta
+
+    # Find any out of date fundamentals
+    sq = Fundamentals.objects.filter(security_id=OuterRef('security_id')).order_by('-fiscal_year')
+    fundamentals_list = list(
+        Fundamentals.objects.filter(
+            Q(pk=Subquery(sq.values('pk')[:1])) & Q(security__symbol__in=proposed_tickers) & ~Q(fiscal_year__lte=current_year)
+        ).values_list('security__symbol', flat=True)
+    )
+    ood_tickers['fundamentals'] = fundamentals_list + not_in_funda
+
+
+    # Find any out of date price records
+    sq = SecurityPrice.objects.filter(security_id=OuterRef('security_id')).order_by('-date')
+    prices_list = list(
+        SecurityPrice.objects.filter(
+            Q(pk=Subquery(sq.values('pk')[:1])) & Q(security__symbol__in=proposed_tickers) & ~Q(date__lte=price_lapse_date)
+        ).values_list('security__symbol', flat=True)
+    )
+    ood_tickers['securityprice'] = prices_list + not_in_prices
 
     return ood_tickers
 

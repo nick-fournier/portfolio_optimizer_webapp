@@ -56,7 +56,7 @@ class DownloadCompanyData:
             self.set_data(db_name='scores', data=scores)
 
             # 4) Filter out stock picks by score threshold. Keep any that ever exceed it (for backtesting)
-            max_ticker_scores = (PFScores.scores.pf_score > self.score_cutoff).groupby('symbol').any()
+            max_ticker_scores = (PFScores.scores.pf_score > self.score_cutoff).groupby(level=0).any()
             price_tickers = max_ticker_scores[max_ticker_scores].index
 
             # Add out of date prices to update, remove duplicates
@@ -127,10 +127,19 @@ class DownloadCompanyData:
             trailing=False
         )
 
+        # Add dummy data for index
+        if 'Cash Flow data unavailable' in fundamentals:
+            fundamentals = pd.DataFrame(None, index=['^GSPC'], columns=['asOfDate'] + list(fields_map.keys()))
+            fundamentals.asOfDate = datetime.date.today()
+
         # Cleanup and add security id
-        fundamentals.rename(columns={**{'asOfDate': 'date'}, **fields_map}, inplace=True)
-        fundamentals.drop(columns=['periodType', 'currencyCode'], inplace=True)
         fundamentals = fundamentals.join(self.id_table.set_index('symbol'))
+        
+        fundamentals.rename(columns={**{'asOfDate': 'date'}, **fields_map}, inplace=True)
+        
+        if len(set(fundamentals.columns).intersection(['periodType', 'currencyCode'])) > 0:
+            fundamentals.drop(columns=['periodType', 'currencyCode'], inplace=True)
+            
 
         # Add empty fields if missing
         for f in fields_map.values():
