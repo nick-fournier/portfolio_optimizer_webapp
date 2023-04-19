@@ -23,8 +23,8 @@
     <thead class="thead-dark">
     <tr>
         <th>Symbol</th>
-        <th>Name</th>
-<!--        <th>Calculation date</th>-->
+        <!-- <th>Name</th> -->
+        <!--<th>Calculation date</th>-->
         <!--Allocation-->
         <th>Allocation</th>
         <th>Shares</th>
@@ -32,7 +32,7 @@
         <th>F-score</th>
         <th>Weighted F-score</th>
         <th>EPS</th>
-        <th>P/E Ratio</th>
+        <!--<th>P/E Ratio</th>-->
         <!--Profitability-->
         <th>Return On Assets (ROA)</th>
         <th>&#916; Cash</th>
@@ -52,8 +52,8 @@
     {% for i in score_table %}
     <tr>
         <td>{{i.symbol}}</td>
-        <td>{{i.longname}}</td>
-<!--        <td>{{i.date}}</td>-->
+        <!--<td>{{i.longname}}</td>-->
+        <!--<td>{{i.date}}</td>-->
         <!--Allocation-->
         <td>{{i.allocation}}</td>
         <td>{{i.shares}}</td>
@@ -61,7 +61,7 @@
         <td>{{i.pf_score}}</td>
         <td>{{i.pf_score_weighted}}</td>
         <td>{{i.eps}}</td>
-        <td>{{i.pe_ratio}}</td>
+        <!--<td>{{i.pe_ratio}}</td>-->
         <!--Profitability-->
         <td>{{i.roa}}</td>
         <td>{{i.delta_cash}}</td>
