@@ -1,5 +1,5 @@
 
-from ..models import Portfolio, SecurityPrice
+from ..models import Portfolio, SecurityPrice, SecurityList
 from ..optimizer import optimization, download
 import pandas as pd
 from io import BytesIO
@@ -26,6 +26,8 @@ def compare_ytd():
     symbol_list = portfolio_df.security__symbol.to_list() + ['^GSPC']
 
     # Update prices to latest
+    
+    
     download.DownloadCompanyData(symbol_list)
 
     # Get price data

@@ -94,7 +94,7 @@ class DashboardView(FormView):
         )
         optimalPortfolio.save_portfolio()
 
-        return HttpResponseRedirect(reverse_lazy('dashboard'))
+        return HttpResponseRedirect(reverse_lazy('portfolio-optimizer-dashboard'))
 
     def get_context_data(self, **kwargs):
         context = super(DashboardView, self).get_context_data(**kwargs)
@@ -151,13 +151,13 @@ class AddDataView(FormView):
     model = Scores
     form_class = AddDataForm
     template_name = 'optimizer/add-data.html'
-    success_url = reverse_lazy('add-data')
+    success_url = reverse_lazy('portfolio-optimizer-add-data')
     snp_list = utils.get_latest_snp()
     snp_tickers = [x['Symbol'] for x in snp_list]
 
     def form_valid(self, form):
         if not DataSettings.objects.exists() or not self.request.user.is_authenticated:
-            return HttpResponseRedirect(reverse_lazy('add-data'))
+            return HttpResponseRedirect(reverse_lazy('portfolio-optimizer-add-data'))
 
         symbol_fieldval = form.cleaned_data['symbols']
 
@@ -191,7 +191,7 @@ class AddDataView(FormView):
             print('Updating chunk ' + ', '.join(chunk))
             download.DownloadCompanyData(chunk)
 
-        return HttpResponseRedirect(reverse_lazy('add-data'))
+        return HttpResponseRedirect(reverse_lazy('portfolio-optimizer-add-data'))
 
     def get_context_data(self, **kwargs):
         context = super(AddDataView, self).get_context_data(**kwargs)
