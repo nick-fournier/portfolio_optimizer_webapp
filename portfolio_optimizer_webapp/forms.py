@@ -1,13 +1,6 @@
 from django import forms
 from django.core import validators
-from django.forms import ModelForm
-from django.forms.widgets import DateInput
-
-
 from .models import DataSettings
-
-from django.db.utils import OperationalError
-import datetime
 
 
 class MinLengthValidator(validators.MinLengthValidator):
@@ -42,16 +35,6 @@ class CommaSeparatedCharField(forms.Field):
         self.run_validators(value)
         return value
 
-# class OptimizeForm(forms.Form):
-#     OBJ_CHOICES =[
-#         ('max_sharpe', 'Maximum Sharpe Ratio'),
-#         ('min_volatility', 'Minimum Volatility')
-#     ]
-#
-#     investment_amount = forms.DecimalField(initial=10000)
-#     FScore_threshold = forms.IntegerField(initial=6)
-#     objective = forms.ChoiceField(choices=OBJ_CHOICES, initial='max_sharpe')
-
 class OptimizeForm(forms.ModelForm):
     class Meta:
         model = DataSettings
@@ -69,16 +52,3 @@ class MultipleForm(forms.Form):
 class AddDataForm(forms.Form):
     symbols = CommaSeparatedCharField()
 
-# class DataSettingsForm(ModelForm):
-#     try:
-#         start_date = DataSettings.objects.first()
-#     except OperationalError:
-#         default_start_date = datetime.date.today() - datetime.timedelta(days=365)
-#         start_date = forms.DateField(initial=default_start_date)
-
-#     class Meta:
-#         model = DataSettings
-#         fields = ['start_date']
-#         widgets = {
-#             'start_date': DateInput(attrs={'type': 'date'}),
-#         }

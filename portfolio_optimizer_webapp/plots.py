@@ -1,6 +1,4 @@
-
-from ..models import Portfolio, SecurityPrice, SecurityList
-from ..optimizer import optimization, download
+from portfolio_optimizer_webapp.models import Portfolio, SecurityPrice, Scores
 import pandas as pd
 from io import BytesIO
 import base64
@@ -22,13 +20,8 @@ def compare_ytd():
     if portfolio_df.empty:
         return
 
-    # Get symbols and IDs
+    # Get symbols and IDs 
     symbol_list = portfolio_df.security__symbol.to_list() + ['^GSPC']
-
-    # Update prices to latest
-    
-    
-    download.DownloadCompanyData(symbol_list)
 
     # Get price data
     prices_qry = SecurityPrice.objects.filter(security__symbol__in=symbol_list)
@@ -39,7 +32,8 @@ def compare_ytd():
     prices_df.close = prices_df.close.astype(float)
 
     prices_grper = prices_df.groupby('security_id', group_keys=False)
-    prices_df['cum_pct_chg'] = prices_grper.close.apply(optimization.pct_change_from_first)
+    
+    prices_df['cum_pct_chg'] = prices_grper.close.apply(lambda x: x.div(x.iloc[0]).subtract(1).mul(100))
 
     # cast price to wide rows x cols = date x symbol
     prices_wide = prices_df.pivot(index='date', columns='security__symbol', values='cum_pct_chg')
@@ -64,9 +58,47 @@ def compare_ytd():
     return plot(fig, output_type='div')
 
 
+def get_analysis_data():
+    score_cols = ['security_id', 'date', 'security__symbol', 'fiscal_year',
+                  'pf_score', 'pf_score_weighted', 'eps', 'pe_ratio', 'roa', 'cash', 'cash_ratio',
+                  'delta_cash', 'delta_roa', 'accruals', 'delta_long_lev_ratio',
+                  'delta_current_lev_ratio', 'delta_shares', 'delta_gross_margin', 'delta_asset_turnover']
+
+    # financials = models.Fundamentals.objects.all().values('security_id', 'date')
+    prices_qry = SecurityPrice.objects.all().values('security_id', 'date', 'close')
+    scores_qry = Scores.objects.all().values(*score_cols)
+
+    # As dataframe
+    # financials = pd.DataFrame(financials)
+    prices = pd.DataFrame(prices_qry)
+    df = pd.DataFrame(scores_qry).rename(columns={'security__fundamentals__fiscal_year': 'year'})
+
+    pd.DataFrame(Scores.objects.all().values('security_id', 'date', 'security__fundamentals__fiscal_year'))
+
+    # Aggregate price data annually
+    prices.close = prices.close.astype(float)
+    prices.date = pd.to_datetime(prices.date)
+
+    col_names = {'date': 'year', 'last': 'yearly_close', 'var': 'variance'}
+    prices_year = prices.groupby([prices.date.dt.year, 'security_id']).close\
+        .agg(['last', 'mean', 'var']).reset_index()\
+        .rename(columns=col_names)
+
+    # Add year and merge prices
+    df.date = pd.to_datetime(df.date)
+    df.rename(columns={'fiscal_year': 'year'}, inplace=True)
+    df = df.merge(prices_year, on=['security_id', 'year'])
+
+    # df.yearly_close = df.yearly_close.astype(float)
+    df.pe_ratio = df.pe_ratio.astype(float)
+    df = df.sort_values(['security_id', 'date'])
+
+    return df
+
+
 def create_plots(plot_data=None):
     if not plot_data:
-        plot_data = optimization.get_analysis_data()
+        plot_data = get_analysis_data()
     df = plot_data
 
     plots = {}

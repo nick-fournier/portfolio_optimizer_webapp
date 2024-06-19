@@ -1,7 +1,7 @@
 include LICENSE
 include README.md
-recursive-include portfolio_optimizer/optimizer *
-recursive-include portfolio_optimizer/templates *
-recursive-include portfolio_optimizer/static *
-recursive-include portfolio_optimizer/fixtures *
+recursive-include portfolio_optimizer_webapp/optimizer *
+recursive-include portfolio_optimizer_webapp/templates *
+recursive-include portfolio_optimizer_webapp/static *
+recursive-include portfolio_optimizer_webapp/fixtures *
 recursive-include docs *

@@ -1,23 +1,13 @@
 {% extends 'optimizer_base.html' %}
 {% block content %}
 
-<div style="width:90%;height:50%">{{ plots.spx|safe }}</div>
-
-<form action="" method="post">
-    {% csrf_token %}
-    {{ form }}
-    <input type="submit" value="Optimize portfolio">
-</form>
-
-{#<form action="" method="post">#}
-{#    {% csrf_token %}#}
-{#    {{ forms.optimize }}#}
-{#    <div id="progress-wrapper">#}
-{#        <input type="submit" value="Update scores", id="progress-bar-trigger">#}
-{#        <div id="progress-bar" style="background-color: blue; width: 0%;">&nbsp;</div>#}
-{#        <div id="progress-bar-message"> </div>#}
-{#    </div>#}
-{#</form>#}
+{% if plots %}
+    <div style="width:90%;height:50%">{{ plots.spx|safe }}</div>
+{% else %}
+    <div class="alert alert-warning" role="alert">
+        No plot data available
+    </div>
+{% endif %}
 
 <table class="table table-sm", style="width:100%">
     <thead class="thead-dark">
@@ -76,6 +66,10 @@
         <td>{{i.delta_asset_turnover}}</td>
     </tr>
     {% endfor %}
+    {% else %}
+    <tr>
+        <td colspan="14" class="alert alert-warning" role="alert" >No data available</td>
+    </tr>
     {% endif %}
     </tbody>
 </table>

@@ -1,5 +1,4 @@
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db.models import CheckConstraint, Q
 from django.db import models
 import pandas as pd
 import datetime
@@ -44,12 +43,12 @@ class DataSettings(models.Model):
 
 
 class SecurityList(models.Model):
-    symbol = models.CharField(default=None, null=True, max_length=12)
-    last_updated = models.DateTimeField(auto_now=True)
+    symbol = models.CharField(max_length=12, primary_key=True)
+    last_updated = models.DateTimeField(default=None, null=True)
     first_created = models.DateTimeField(auto_now_add=True)
     # exchange_id = models.ForeignKey(Exchange, on_delete=models.CASCADE)
     # currency = models.CharField(default=None, null=True, max_length=3)
-    # longname = models.CharField(default=None, null=True, max_length=100)
+    name = models.CharField(default=None, null=True, max_length=100)
     country = models.CharField(default=None, null=True, max_length=100)
     sector = models.CharField(default=None, null=True, max_length=50)
     industry = models.CharField(default=None, null=True, max_length=50)
@@ -66,7 +65,7 @@ class Portfolio(models.Model):
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
     allocation = models.DecimalField(max_digits=10, null=True, decimal_places=6)
     shares = models.IntegerField(default=None, null=True)
-    year = models.IntegerField(default=None, null=True)
+    fiscal_year = models.IntegerField(default=None, null=True)
 
 class Scores(models.Model):
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
