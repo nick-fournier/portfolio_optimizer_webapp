@@ -45,18 +45,18 @@ class DataSettings(models.Model):
 class SecurityList(models.Model):
     symbol = models.CharField(max_length=12, primary_key=True)
     last_updated = models.DateTimeField(default=None, null=True)
-    first_created = models.DateTimeField(auto_now_add=True)
+    # first_created = models.DateTimeField(auto_now_add=True)
     # exchange_id = models.ForeignKey(Exchange, on_delete=models.CASCADE)
     # currency = models.CharField(default=None, null=True, max_length=3)
     name = models.CharField(default=None, null=True, max_length=100)
     country = models.CharField(default=None, null=True, max_length=100)
     sector = models.CharField(default=None, null=True, max_length=50)
     industry = models.CharField(default=None, null=True, max_length=50)
-    logo_url = models.CharField(default=None, null=True, max_length=100)
+    # logo_url = models.CharField(default=None, null=True, max_length=100)
     fulltime_employees = models.IntegerField(default=None, null=True)
     business_summary = models.CharField(default=None, null=True, max_length=3000)
-    has_fundamentals = models.BooleanField(default=False)
-    has_securityprice = models.BooleanField(default=False)
+    # has_fundamentals = models.BooleanField(default=False)
+    # has_securityprice = models.BooleanField(default=False)
 
     def __str__(self):
         return self.symbol
