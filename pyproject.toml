@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "portfolio-optimizer-webapp"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
 authors = ["Nick Fournier <nichfournier@gmail.com>"]
 readme = "README.md"
