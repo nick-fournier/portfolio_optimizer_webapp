@@ -54,7 +54,7 @@ class SecurityList(models.Model):
     industry = models.CharField(default=None, null=True, max_length=50)
     # logo_url = models.CharField(default=None, null=True, max_length=100)
     fulltime_employees = models.IntegerField(default=None, null=True)
-    business_summary = models.CharField(default=None, null=True, max_length=3000)
+    business_summary = models.CharField(default=None, null=True, max_length=5000)
     # has_fundamentals = models.BooleanField(default=False)
     # has_securityprice = models.BooleanField(default=False)
 
