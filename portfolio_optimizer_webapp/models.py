@@ -20,6 +20,10 @@ def get_fiscal_year(date):
 
 
 class DataSettings(models.Model):
+    
+    class Meta:
+        db_table = 'data_settings'
+    
     OBJ_CHOICES = [
         ('max_sharpe', 'Maximum Sharpe Ratio'),
         ('min_volatility', 'Minimum Volatility'),
@@ -43,6 +47,10 @@ class DataSettings(models.Model):
 
 
 class SecurityList(models.Model):
+    
+    class Meta:
+        db_table = 'security_list'
+
     symbol = models.CharField(max_length=12, primary_key=True)
     last_updated = models.DateTimeField(default=None, null=True)
     # first_created = models.DateTimeField(auto_now_add=True)
@@ -94,6 +102,10 @@ class Scores(models.Model):
         super(Scores, self).save(*args, **kwargs)
 
 class SecurityPrice(models.Model):
+    
+    class Meta:
+        db_table = 'security_price'
+    
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
     date = models.DateField(null=True)
     open = models.DecimalField(max_digits=10, decimal_places=6)
@@ -107,6 +119,10 @@ class SecurityPrice(models.Model):
 
 
 class Fundamentals(models.Model):
+    
+    class Meta:
+        db_table = 'fundamentals'
+    
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
     date = models.DateField(null=True)
     fiscal_year = models.IntegerField(default=None, null=True)
