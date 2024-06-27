@@ -70,12 +70,20 @@ class SecurityList(models.Model):
         return self.symbol
 
 class Portfolio(models.Model):
+    
+    class Meta:
+        db_table = 'portfolio'
+
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
     allocation = models.DecimalField(max_digits=10, null=True, decimal_places=6)
     shares = models.IntegerField(default=None, null=True)
     fiscal_year = models.IntegerField(default=None, null=True)
 
 class Scores(models.Model):
+    
+    class Meta:
+        db_table = 'scores'
+    
     security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
     date = models.DateField(null=True)
     fiscal_year = models.IntegerField(default=None, null=True)
