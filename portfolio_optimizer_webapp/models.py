@@ -74,7 +74,7 @@ class Portfolio(models.Model):
     class Meta:
         db_table = 'portfolio'
 
-    security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
+    symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
     allocation = models.DecimalField(max_digits=10, null=True, decimal_places=6)
     shares = models.IntegerField(default=None, null=True)
     fiscal_year = models.IntegerField(default=None, null=True)
@@ -84,7 +84,7 @@ class Scores(models.Model):
     class Meta:
         db_table = 'scores'
     
-    security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
+    symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
     date = models.DateField(null=True)
     fiscal_year = models.IntegerField(default=None, null=True)
     pf_score = models.IntegerField(default=None, null=True)
@@ -114,7 +114,7 @@ class SecurityPrice(models.Model):
     class Meta:
         db_table = 'security_price'
     
-    security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
+    symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
     date = models.DateField(null=True)
     open = models.DecimalField(max_digits=10, decimal_places=6)
     high = models.DecimalField(max_digits=10, decimal_places=6)
@@ -131,7 +131,7 @@ class Fundamentals(models.Model):
     class Meta:
         db_table = 'fundamentals'
     
-    security = models.ForeignKey(SecurityList, on_delete=models.CASCADE)
+    symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
     date = models.DateField(null=True)
     fiscal_year = models.IntegerField(default=None, null=True)
     net_income = models.IntegerField(default=None, null=True)
