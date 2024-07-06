@@ -130,21 +130,143 @@ class Fundamentals(models.Model):
     
     class Meta:
         db_table = 'fundamentals'
-    
+        unique_together = ('symbol', 'as_of_date', 'period_type', 'currency_code')
+        
     symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
-    date = models.DateField(null=True)
-    fiscal_year = models.IntegerField(default=None, null=True)
-    net_income = models.IntegerField(default=None, null=True)
-    net_income_common_stockholders = models.IntegerField(default=None, null=True)
-    total_liabilities = models.IntegerField(default=None, null=True)
-    total_assets = models.IntegerField(default=None, null=True)
-    current_assets = models.IntegerField(default=None, null=True)
-    current_liabilities = models.IntegerField(default=None, null=True)
-    shares_outstanding = models.IntegerField(default=None, null=True)
-    cash = models.IntegerField(default=None, null=True)
-    gross_profit = models.IntegerField(default=None, null=True)
-    total_revenue = models.IntegerField(default=None, null=True)
+    as_of_date = models.DateField()
+    period_type = models.CharField()
+    net_income = models.BigIntegerField(default=None, null=True)
+    net_income_common_stockholders = models.BigIntegerField(default=None, null=True)
+    total_liabilities_net_minority_interest = models.BigIntegerField(default=None, null=True)
+    total_assets = models.BigIntegerField(default=None, null=True)
+    current_assets = models.BigIntegerField(default=None, null=True)
+    current_liabilities = models.BigIntegerField(default=None, null=True)
+    capital_stock = models.BigIntegerField(default=None, null=True)
+    cash_and_cash_equivalents = models.BigIntegerField(default=None, null=True)
+    gross_profit = models.BigIntegerField(default=None, null=True)
+    total_revenue = models.BigIntegerField(default=None, null=True)
+    currency_code = models.CharField(default=None, null=True, max_length=3)
+    enterprise_value = models.BigIntegerField(default=None, null=True)
+    enterprises_value_ebitda_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    enterprises_value_revenue_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    forward_pe_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    market_cap = models.BigIntegerField(default=None, null=True)
+    pb_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    pe_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    peg_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    ps_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
 
     def save(self, *args, **kwargs):
-        self.fiscal_year = get_fiscal_year(self.date)
+        self.fiscal_year = get_fiscal_year(self.as_of_date)
         super(Fundamentals, self).save(*args, **kwargs)
+
+
+balance_sheet = [
+    'AccountsPayable', 'AccountsReceivable', 'AccruedInterestReceivable',
+    'AccumulatedDepreciation', 'AdditionalPaidInCapital',
+    'AllowanceForDoubtfulAccountsReceivable', 'AssetsHeldForSaleCurrent',
+    'AvailableForSaleSecurities', 'BuildingsAndImprovements', 'CapitalLeaseObligations',
+    'CapitalStock', 'CashAndCashEquivalents', 'CashCashEquivalentsAndShortTermInvestments',
+    'CashEquivalents', 'CashFinancial', 'CommercialPaper', 'CommonStock',
+    'CommonStockEquity', 'ConstructionInProgress', 'CurrentAccruedExpenses',
+    'CurrentAssets', 'CurrentCapitalLeaseObligation', 'CurrentDebt',
+    'CurrentDebtAndCapitalLeaseObligation', 'CurrentDeferredAssets',
+    'CurrentDeferredLiabilities', 'CurrentDeferredRevenue', 'CurrentDeferredTaxesAssets',
+    'CurrentDeferredTaxesLiabilities', 'CurrentLiabilities', 'CurrentNotesPayable',
+    'CurrentProvisions', 'DefinedPensionBenefit', 'DerivativeProductLiabilities',
+    'DividendsPayable', 'DuefromRelatedPartiesCurrent', 'DuefromRelatedPartiesNonCurrent',
+    'DuetoRelatedPartiesCurrent', 'DuetoRelatedPartiesNonCurrent', 'EmployeeBenefits',
+    'FinancialAssets', 'FinancialAssetsDesignatedasFairValueThroughProfitorLossTotal',
+    'FinishedGoods', 'FixedAssetsRevaluationReserve', 'ForeignCurrencyTranslationAdjustments',
+    'GainsLossesNotAffectingRetainedEarnings', 'GeneralPartnershipCapital', 'Goodwill',
+    'GoodwillAndOtherIntangibleAssets', 'GrossAccountsReceivable', 'GrossPPE',
+    'HedgingAssetsCurrent', 'HeldToMaturitySecurities', 'IncomeTaxPayable',
+    'InterestPayable', 'InventoriesAdjustmentsAllowances', 'Inventory',
+    'InvestedCapital', 'InvestmentProperties', 'InvestmentinFinancialAssets',
+    'InvestmentsAndAdvances', 'InvestmentsInOtherVenturesUnderEquityMethod',
+    'InvestmentsinAssociatesatCost', 'InvestmentsinJointVenturesatCost',
+    'InvestmentsinSubsidiariesatCost', 'LandAndImprovements', 'Leases',
+    'LiabilitiesHeldforSaleNonCurrent', 'LimitedPartnershipCapital',
+    'LineOfCredit', 'LoansReceivable', 'LongTermCapitalLeaseObligation',
+    'LongTermDebt', 'LongTermDebtAndCapitalLeaseObligation', 'LongTermEquityInvestment',
+    'LongTermProvisions', 'MachineryFurnitureEquipment', 'MinimumPensionLiabilities',
+    'MinorityInterest', 'NetDebt', 'NetPPE', 'NetTangibleAssets', 'NonCurrentAccountsReceivable',
+    'NonCurrentAccruedExpenses', 'NonCurrentDeferredAssets', 'NonCurrentDeferredLiabilities',
+    'NonCurrentDeferredRevenue', 'NonCurrentDeferredTaxesAssets', 'NonCurrentDeferredTaxesLiabilities',
+    'NonCurrentNoteReceivables', 'NonCurrentPensionAndOtherPostretirementBenefitPlans',
+    'NonCurrentPrepaidAssets', 'NotesReceivable', 'OrdinarySharesNumber',
+    'OtherCapitalStock', 'OtherCurrentAssets', 'OtherCurrentBorrowings',
+    'OtherCurrentLiabilities', 'OtherEquityAdjustments', 'OtherEquityInterest',
+    'OtherIntangibleAssets', 'OtherInventories', 'OtherInvestments', 'OtherNonCurrentAssets',
+    'OtherNonCurrentLiabilities', 'OtherPayable', 'OtherProperties', 'OtherReceivables',
+    'OtherShortTermInvestments', 'Payables', 'PayablesAndAccruedExpenses',
+    'PensionandOtherPostRetirementBenefitPlansCurrent', 'PreferredSecuritiesOutsideStockEquity',
+    'PreferredSharesNumber', 'PreferredStock', 'PreferredStockEquity',
+    'PrepaidAssets', 'Properties', 'RawMaterials', 'Receivables',
+    'ReceivablesAdjustmentsAllowances', 'RestrictedCash', 'RestrictedCommonStock',
+    'RetainedEarnings', 'ShareIssued', 'StockholdersEquity', 'TangibleBookValue',
+    'TaxesReceivable', 'TotalAssets', 'TotalCapitalization', 'TotalDebt',
+    'TotalEquityGrossMinorityInterest', 'TotalLiabilitiesNetMinorityInterest',
+    'TotalNonCurrentAssets', 'TotalNonCurrentLiabilitiesNetMinorityInterest',
+    'TotalPartnershipCapital', 'TotalTaxPayable', 'TradeandOtherPayablesNonCurrent',
+    'TradingSecurities', 'TreasurySharesNumber', 'TreasuryStock', 'UnrealizedGainLoss',
+    'WorkInProcess', 'WorkingCapital'
+]
+
+cash_flow = [
+    'RepaymentOfDebt', 'RepurchaseOfCapitalStock', 'CashDividendsPaid',
+    'CommonStockIssuance', 'ChangeInWorkingCapital',
+    'CapitalExpenditure',
+    'CashFlowFromContinuingFinancingActivities', 'NetIncome',
+    'FreeCashFlow', 'ChangeInCashSupplementalAsReported',
+    'SaleOfInvestment', 'EndCashPosition', 'OperatingCashFlow',
+    'DeferredIncomeTax', 'NetOtherInvestingChanges',
+    'ChangeInAccountPayable', 'NetOtherFinancingCharges',
+    'PurchaseOfInvestment', 'ChangeInInventory',
+    'DepreciationAndAmortization', 'PurchaseOfBusiness',
+    'InvestingCashFlow', 'ChangesInAccountReceivables',
+    'StockBasedCompensation', 'OtherNonCashItems',
+    'BeginningCashPosition'
+]
+
+income_statement = [
+    'Amortization', 'AmortizationOfIntangiblesIncomeStatement',
+    'AverageDilutionEarnings', 'BasicAccountingChange', 'BasicAverageShares',
+    'BasicContinuousOperations', 'BasicDiscontinuousOperations', 'BasicEPS',
+    'BasicEPSOtherGainsLosses', 'BasicExtraordinary', 'ContinuingAndDiscontinuedBasicEPS',
+    'ContinuingAndDiscontinuedDilutedEPS', 'CostOfRevenue', 'DepletionIncomeStatement',
+    'DepreciationAmortizationDepletionIncomeStatement', 'DepreciationAndAmortizationInIncomeStatement',
+    'DepreciationIncomeStatement', 'DilutedAccountingChange', 'DilutedAverageShares',
+    'DilutedContinuousOperations', 'DilutedDiscontinuousOperations', 'DilutedEPS',
+    'DilutedEPSOtherGainsLosses', 'DilutedExtraordinary', 'DilutedNIAvailtoComStockholders',
+    'DividendPerShare', 'EBIT', 'EBITDA', 'EarningsFromEquityInterest',
+    'EarningsFromEquityInterestNetOfTax', 'ExciseTaxes', 'GainOnSaleOfBusiness',
+    'GainOnSaleOfPPE', 'GainOnSaleOfSecurity', 'GeneralAndAdministrativeExpense',
+    'GrossProfit', 'ImpairmentOfCapitalAssets', 'InsuranceAndClaims',
+    'InterestExpense', 'InterestExpenseNonOperating', 'InterestIncome',
+    'InterestIncomeNonOperating', 'MinorityInterests', 'NetIncome', 'NetIncomeCommonStockholders',
+    'NetIncomeContinuousOperations', 'NetIncomeDiscontinuousOperations',
+    'NetIncomeExtraordinary', 'NetIncomeFromContinuingAndDiscontinuedOperation',
+    'NetIncomeFromContinuingOperationNetMinorityInterest', 'NetIncomeFromTaxLossCarryforward',
+    'NetIncomeIncludingNoncontrollingInterests', 'NetInterestIncome',
+    'NetNonOperatingInterestIncomeExpense', 'NormalizedBasicEPS', 'NormalizedDilutedEPS',
+    'NormalizedEBITDA', 'NormalizedIncome', 'OperatingExpense', 'OperatingIncome',
+    'OperatingRevenue', 'OtherGandA', 'OtherIncomeExpense', 'OtherNonOperatingIncomeExpenses',
+    'OtherOperatingExpenses', 'OtherSpecialCharges', 'OtherTaxes',
+    'OtherunderPreferredStockDividend', 'PreferredStockDividends',
+    'PretaxIncome', 'ProvisionForDoubtfulAccounts', 'ReconciledCostOfRevenue',
+    'ReconciledDepreciation', 'RentAndLandingFees', 'RentExpenseSupplemental',
+    'ReportedNormalizedBasicEPS', 'ReportedNormalizedDilutedEPS', 'ResearchAndDevelopment',
+    'RestructuringAndMergernAcquisition', 'SalariesAndWages', 'SecuritiesAmortization',
+    'SellingAndMarketingExpense', 'SellingGeneralAndAdministration', 'SpecialIncomeCharges',
+    'TaxEffectOfUnusualItems', 'TaxLossCarryforwardBasicEPS', 'TaxLossCarryforwardDilutedEPS',
+    'TaxProvision', 'TaxRateForCalcs', 'TotalExpenses', 'TotalOperatingIncomeAsReported',
+    'TotalOtherFinanceCost', 'TotalRevenue', 'TotalUnusualItems',
+    'TotalUnusualItemsExcludingGoodwill', 'WriteOff'
+]
+    
+valuation_measures = [
+    'ForwardPeRatio', 'PsRatio', 'PbRatio',
+    'EnterprisesValueEBITDARatio', 'EnterprisesValueRevenueRatio',
+    'PeRatio', 'MarketCap', 'EnterpriseValue', 'PegRatio'
+]
