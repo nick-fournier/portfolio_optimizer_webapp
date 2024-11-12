@@ -135,8 +135,8 @@ class Fundamentals(models.Model):
 
 class Scores(models.Model):
     
-#     class Meta:
-#         db_table = 'scores'
+    class Meta:
+        db_table = 'scores'
         # unique_together = ('symbol', 'as_of_date', 'period_type', 'currency_code')
     
     fundamentals = models.OneToOneField(Fundamentals, on_delete=models.CASCADE, primary_key=True)
