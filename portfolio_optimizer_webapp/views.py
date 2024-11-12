@@ -5,7 +5,7 @@ from django.urls import reverse_lazy
 from django.views.generic.edit import FormView
 from django.views.generic.base import TemplateView
 
-from portfolio_optimizer_webapp.models import Scores, DataSettings, Portfolio, SecurityList
+from portfolio_optimizer_webapp.models import Fundamentals as Scores, DataSettings, Portfolio, SecurityList
 from portfolio_optimizer_webapp import plots
 
 import datetime

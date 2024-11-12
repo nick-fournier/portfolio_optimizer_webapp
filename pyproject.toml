@@ -1,16 +1,16 @@
 [tool.poetry]
 name = "portfolio-optimizer-webapp"
-version = "0.1.5"
+version = "0.1.6"
 description = ""
 authors = ["Nick Fournier <nichfournier@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.15"
-Django = "^5.0.6"
-pandas = "^2.2.2"
-plotly = "^5.22.0"
-markdown = "^3.6"
+python = "^3.11"
+Django = "^4.2"
+pandas = "^2.2.3"
+plotly = "^5.24.1"
+markdown = "^3.7"
 
 
 [build-system]

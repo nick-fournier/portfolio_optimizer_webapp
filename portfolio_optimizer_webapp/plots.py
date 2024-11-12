@@ -1,4 +1,4 @@
-from portfolio_optimizer_webapp.models import Portfolio, SecurityPrice, Scores
+from portfolio_optimizer_webapp.models import Portfolio, SecurityPrice#, Scores
 import pandas as pd
 from io import BytesIO
 import base64

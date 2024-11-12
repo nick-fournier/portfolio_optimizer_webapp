@@ -79,35 +79,6 @@ class Portfolio(models.Model):
     shares = models.IntegerField(default=None, null=True)
     fiscal_year = models.IntegerField(default=None, null=True)
 
-class Scores(models.Model):
-    
-    class Meta:
-        db_table = 'scores'
-    
-    symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
-    date = models.DateField(null=True)
-    fiscal_year = models.IntegerField(default=None, null=True)
-    pf_score = models.IntegerField(default=None, null=True)
-    pf_score_weighted = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    eps = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    pe_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    roa = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    cash = models.BigIntegerField(default=None, null=True)
-    cash_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    delta_cash = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    delta_roa = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    accruals = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    delta_long_lev_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    delta_current_lev_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    delta_shares = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    delta_gross_margin = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    delta_asset_turnover = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    # yearly_close = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-    # yearly_variance = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-
-    def save(self, *args, **kwargs):
-        self.fiscal_year = get_fiscal_year(self.date)
-        super(Scores, self).save(*args, **kwargs)
 
 class SecurityPrice(models.Model):
     
@@ -156,117 +127,46 @@ class Fundamentals(models.Model):
     peg_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     ps_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
 
+
     def save(self, *args, **kwargs):
         self.fiscal_year = get_fiscal_year(self.as_of_date)
         super(Fundamentals, self).save(*args, **kwargs)
 
 
-balance_sheet = [
-    'AccountsPayable', 'AccountsReceivable', 'AccruedInterestReceivable',
-    'AccumulatedDepreciation', 'AdditionalPaidInCapital',
-    'AllowanceForDoubtfulAccountsReceivable', 'AssetsHeldForSaleCurrent',
-    'AvailableForSaleSecurities', 'BuildingsAndImprovements', 'CapitalLeaseObligations',
-    'CapitalStock', 'CashAndCashEquivalents', 'CashCashEquivalentsAndShortTermInvestments',
-    'CashEquivalents', 'CashFinancial', 'CommercialPaper', 'CommonStock',
-    'CommonStockEquity', 'ConstructionInProgress', 'CurrentAccruedExpenses',
-    'CurrentAssets', 'CurrentCapitalLeaseObligation', 'CurrentDebt',
-    'CurrentDebtAndCapitalLeaseObligation', 'CurrentDeferredAssets',
-    'CurrentDeferredLiabilities', 'CurrentDeferredRevenue', 'CurrentDeferredTaxesAssets',
-    'CurrentDeferredTaxesLiabilities', 'CurrentLiabilities', 'CurrentNotesPayable',
-    'CurrentProvisions', 'DefinedPensionBenefit', 'DerivativeProductLiabilities',
-    'DividendsPayable', 'DuefromRelatedPartiesCurrent', 'DuefromRelatedPartiesNonCurrent',
-    'DuetoRelatedPartiesCurrent', 'DuetoRelatedPartiesNonCurrent', 'EmployeeBenefits',
-    'FinancialAssets', 'FinancialAssetsDesignatedasFairValueThroughProfitorLossTotal',
-    'FinishedGoods', 'FixedAssetsRevaluationReserve', 'ForeignCurrencyTranslationAdjustments',
-    'GainsLossesNotAffectingRetainedEarnings', 'GeneralPartnershipCapital', 'Goodwill',
-    'GoodwillAndOtherIntangibleAssets', 'GrossAccountsReceivable', 'GrossPPE',
-    'HedgingAssetsCurrent', 'HeldToMaturitySecurities', 'IncomeTaxPayable',
-    'InterestPayable', 'InventoriesAdjustmentsAllowances', 'Inventory',
-    'InvestedCapital', 'InvestmentProperties', 'InvestmentinFinancialAssets',
-    'InvestmentsAndAdvances', 'InvestmentsInOtherVenturesUnderEquityMethod',
-    'InvestmentsinAssociatesatCost', 'InvestmentsinJointVenturesatCost',
-    'InvestmentsinSubsidiariesatCost', 'LandAndImprovements', 'Leases',
-    'LiabilitiesHeldforSaleNonCurrent', 'LimitedPartnershipCapital',
-    'LineOfCredit', 'LoansReceivable', 'LongTermCapitalLeaseObligation',
-    'LongTermDebt', 'LongTermDebtAndCapitalLeaseObligation', 'LongTermEquityInvestment',
-    'LongTermProvisions', 'MachineryFurnitureEquipment', 'MinimumPensionLiabilities',
-    'MinorityInterest', 'NetDebt', 'NetPPE', 'NetTangibleAssets', 'NonCurrentAccountsReceivable',
-    'NonCurrentAccruedExpenses', 'NonCurrentDeferredAssets', 'NonCurrentDeferredLiabilities',
-    'NonCurrentDeferredRevenue', 'NonCurrentDeferredTaxesAssets', 'NonCurrentDeferredTaxesLiabilities',
-    'NonCurrentNoteReceivables', 'NonCurrentPensionAndOtherPostretirementBenefitPlans',
-    'NonCurrentPrepaidAssets', 'NotesReceivable', 'OrdinarySharesNumber',
-    'OtherCapitalStock', 'OtherCurrentAssets', 'OtherCurrentBorrowings',
-    'OtherCurrentLiabilities', 'OtherEquityAdjustments', 'OtherEquityInterest',
-    'OtherIntangibleAssets', 'OtherInventories', 'OtherInvestments', 'OtherNonCurrentAssets',
-    'OtherNonCurrentLiabilities', 'OtherPayable', 'OtherProperties', 'OtherReceivables',
-    'OtherShortTermInvestments', 'Payables', 'PayablesAndAccruedExpenses',
-    'PensionandOtherPostRetirementBenefitPlansCurrent', 'PreferredSecuritiesOutsideStockEquity',
-    'PreferredSharesNumber', 'PreferredStock', 'PreferredStockEquity',
-    'PrepaidAssets', 'Properties', 'RawMaterials', 'Receivables',
-    'ReceivablesAdjustmentsAllowances', 'RestrictedCash', 'RestrictedCommonStock',
-    'RetainedEarnings', 'ShareIssued', 'StockholdersEquity', 'TangibleBookValue',
-    'TaxesReceivable', 'TotalAssets', 'TotalCapitalization', 'TotalDebt',
-    'TotalEquityGrossMinorityInterest', 'TotalLiabilitiesNetMinorityInterest',
-    'TotalNonCurrentAssets', 'TotalNonCurrentLiabilitiesNetMinorityInterest',
-    'TotalPartnershipCapital', 'TotalTaxPayable', 'TradeandOtherPayablesNonCurrent',
-    'TradingSecurities', 'TreasurySharesNumber', 'TreasuryStock', 'UnrealizedGainLoss',
-    'WorkInProcess', 'WorkingCapital'
-]
-
-cash_flow = [
-    'RepaymentOfDebt', 'RepurchaseOfCapitalStock', 'CashDividendsPaid',
-    'CommonStockIssuance', 'ChangeInWorkingCapital',
-    'CapitalExpenditure',
-    'CashFlowFromContinuingFinancingActivities', 'NetIncome',
-    'FreeCashFlow', 'ChangeInCashSupplementalAsReported',
-    'SaleOfInvestment', 'EndCashPosition', 'OperatingCashFlow',
-    'DeferredIncomeTax', 'NetOtherInvestingChanges',
-    'ChangeInAccountPayable', 'NetOtherFinancingCharges',
-    'PurchaseOfInvestment', 'ChangeInInventory',
-    'DepreciationAndAmortization', 'PurchaseOfBusiness',
-    'InvestingCashFlow', 'ChangesInAccountReceivables',
-    'StockBasedCompensation', 'OtherNonCashItems',
-    'BeginningCashPosition'
-]
-
-income_statement = [
-    'Amortization', 'AmortizationOfIntangiblesIncomeStatement',
-    'AverageDilutionEarnings', 'BasicAccountingChange', 'BasicAverageShares',
-    'BasicContinuousOperations', 'BasicDiscontinuousOperations', 'BasicEPS',
-    'BasicEPSOtherGainsLosses', 'BasicExtraordinary', 'ContinuingAndDiscontinuedBasicEPS',
-    'ContinuingAndDiscontinuedDilutedEPS', 'CostOfRevenue', 'DepletionIncomeStatement',
-    'DepreciationAmortizationDepletionIncomeStatement', 'DepreciationAndAmortizationInIncomeStatement',
-    'DepreciationIncomeStatement', 'DilutedAccountingChange', 'DilutedAverageShares',
-    'DilutedContinuousOperations', 'DilutedDiscontinuousOperations', 'DilutedEPS',
-    'DilutedEPSOtherGainsLosses', 'DilutedExtraordinary', 'DilutedNIAvailtoComStockholders',
-    'DividendPerShare', 'EBIT', 'EBITDA', 'EarningsFromEquityInterest',
-    'EarningsFromEquityInterestNetOfTax', 'ExciseTaxes', 'GainOnSaleOfBusiness',
-    'GainOnSaleOfPPE', 'GainOnSaleOfSecurity', 'GeneralAndAdministrativeExpense',
-    'GrossProfit', 'ImpairmentOfCapitalAssets', 'InsuranceAndClaims',
-    'InterestExpense', 'InterestExpenseNonOperating', 'InterestIncome',
-    'InterestIncomeNonOperating', 'MinorityInterests', 'NetIncome', 'NetIncomeCommonStockholders',
-    'NetIncomeContinuousOperations', 'NetIncomeDiscontinuousOperations',
-    'NetIncomeExtraordinary', 'NetIncomeFromContinuingAndDiscontinuedOperation',
-    'NetIncomeFromContinuingOperationNetMinorityInterest', 'NetIncomeFromTaxLossCarryforward',
-    'NetIncomeIncludingNoncontrollingInterests', 'NetInterestIncome',
-    'NetNonOperatingInterestIncomeExpense', 'NormalizedBasicEPS', 'NormalizedDilutedEPS',
-    'NormalizedEBITDA', 'NormalizedIncome', 'OperatingExpense', 'OperatingIncome',
-    'OperatingRevenue', 'OtherGandA', 'OtherIncomeExpense', 'OtherNonOperatingIncomeExpenses',
-    'OtherOperatingExpenses', 'OtherSpecialCharges', 'OtherTaxes',
-    'OtherunderPreferredStockDividend', 'PreferredStockDividends',
-    'PretaxIncome', 'ProvisionForDoubtfulAccounts', 'ReconciledCostOfRevenue',
-    'ReconciledDepreciation', 'RentAndLandingFees', 'RentExpenseSupplemental',
-    'ReportedNormalizedBasicEPS', 'ReportedNormalizedDilutedEPS', 'ResearchAndDevelopment',
-    'RestructuringAndMergernAcquisition', 'SalariesAndWages', 'SecuritiesAmortization',
-    'SellingAndMarketingExpense', 'SellingGeneralAndAdministration', 'SpecialIncomeCharges',
-    'TaxEffectOfUnusualItems', 'TaxLossCarryforwardBasicEPS', 'TaxLossCarryforwardDilutedEPS',
-    'TaxProvision', 'TaxRateForCalcs', 'TotalExpenses', 'TotalOperatingIncomeAsReported',
-    'TotalOtherFinanceCost', 'TotalRevenue', 'TotalUnusualItems',
-    'TotalUnusualItemsExcludingGoodwill', 'WriteOff'
-]
+class Scores(models.Model):
     
-valuation_measures = [
-    'ForwardPeRatio', 'PsRatio', 'PbRatio',
-    'EnterprisesValueEBITDARatio', 'EnterprisesValueRevenueRatio',
-    'PeRatio', 'MarketCap', 'EnterpriseValue', 'PegRatio'
-]
+#     class Meta:
+#         db_table = 'scores'
+        # unique_together = ('symbol', 'as_of_date', 'period_type', 'currency_code')
+    
+    fundamentals = models.OneToOneField(Fundamentals, on_delete=models.CASCADE, primary_key=True)
+    symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
+    as_of_date = models.DateField()
+    period_type = models.CharField()
+    # fiscal_year = models.IntegerField(default=None, null=True)
+    pf_score = models.IntegerField(default=None, null=True)
+    pf_score_weighted = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    eps = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    pe_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    roa = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    cash = models.BigIntegerField(default=None, null=True)
+    cash_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    delta_cash = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    delta_roa = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    accruals = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    delta_long_lev_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    delta_current_lev_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    delta_shares = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    delta_gross_margin = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    delta_asset_turnover = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    # yearly_close = models.DecimalField(max_digits=17, null=True, decimal_places=2)
+    # yearly_variance = models.DecimalField(max_digits=17, null=True, decimal_places=2)
+
+    # def save(self, *args, **kwargs):
+    #     self.fiscal_year = get_fiscal_year(self.date)
+    #     super(Scores, self).save(*args, **kwargs)
+    
+    
+    def save(self, *args, **kwargs):
+        self.fiscal_year = get_fiscal_year(self.as_of_date)
+        super(Scores, self).save(*args, **kwargs)
