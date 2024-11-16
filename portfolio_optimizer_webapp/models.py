@@ -84,16 +84,17 @@ class SecurityPrice(models.Model):
     
     class Meta:
         db_table = 'security_price'
+        unique_together = ('symbol', 'date')
     
     symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
-    date = models.DateField(null=True)
-    open = models.DecimalField(max_digits=10, decimal_places=6)
-    high = models.DecimalField(max_digits=10, decimal_places=6)
-    low = models.DecimalField(max_digits=10, decimal_places=6)
-    close = models.DecimalField(max_digits=10, decimal_places=6)
-    adjclose = models.DecimalField(max_digits=10, decimal_places=6)
-    # dividends = models.DecimalField(max_digits=10, decimal_places=6)
-    # splits = models.IntegerField(default=None, null=True)
+    date = models.DateField(null=False, default=None)
+    open = models.DecimalField(max_digits=10, decimal_places=6, default=None, null=True)
+    high = models.DecimalField(max_digits=10, decimal_places=6, default=None, null=True)
+    low = models.DecimalField(max_digits=10, decimal_places=6, default=None, null=True)
+    close = models.DecimalField(max_digits=10, decimal_places=6, default=None, null=True)
+    adjclose = models.DecimalField(max_digits=10, decimal_places=6, default=None, null=True)
+    dividends = models.DecimalField(max_digits=10, decimal_places=6, default=None, null=True)
+    splits = models.IntegerField(default=None, null=True)
     volume = models.IntegerField(default=None, null=True)
 
 
