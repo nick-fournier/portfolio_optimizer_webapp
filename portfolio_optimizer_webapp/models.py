@@ -140,17 +140,12 @@ class Scores(models.Model):
         # unique_together = ('symbol', 'as_of_date', 'period_type', 'currency_code')
     
     fundamentals = models.OneToOneField(Fundamentals, on_delete=models.CASCADE, primary_key=True)
-    symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
-    as_of_date = models.DateField()
-    period_type = models.CharField()
+    # symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
+    # as_of_date = models.DateField()
+    # period_type = models.CharField()
     # fiscal_year = models.IntegerField(default=None, null=True)
-    pf_score = models.IntegerField(default=None, null=True)
-    pf_score_weighted = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    eps = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    pe_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    
     roa = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    cash = models.BigIntegerField(default=None, null=True)
-    cash_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     delta_cash = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     delta_roa = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     accruals = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
@@ -159,6 +154,11 @@ class Scores(models.Model):
     delta_shares = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     delta_gross_margin = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     delta_asset_turnover = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    cash_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    eps = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    book_value = models.BigIntegerField(default=None, null=True)
+    pf_score = models.IntegerField(default=None, null=True)
+    pf_score_weighted = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     # yearly_close = models.DecimalField(max_digits=17, null=True, decimal_places=2)
     # yearly_variance = models.DecimalField(max_digits=17, null=True, decimal_places=2)
 
@@ -166,7 +166,6 @@ class Scores(models.Model):
     #     self.fiscal_year = get_fiscal_year(self.date)
     #     super(Scores, self).save(*args, **kwargs)
     
-    
-    def save(self, *args, **kwargs):
-        self.fiscal_year = get_fiscal_year(self.as_of_date)
-        super(Scores, self).save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #     self.fiscal_year = get_fiscal_year(self.as_of_date)
+    #     super(Scores, self).save(*args, **kwargs)
