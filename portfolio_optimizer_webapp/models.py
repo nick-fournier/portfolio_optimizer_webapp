@@ -94,8 +94,8 @@ class SecurityPrice(models.Model):
     close = models.DecimalField(max_digits=10, decimal_places=6, default=None, null=True)
     adjclose = models.DecimalField(max_digits=10, decimal_places=6, default=None, null=True)
     dividends = models.DecimalField(max_digits=10, decimal_places=6, default=None, null=True)
-    splits = models.IntegerField(default=None, null=True)
-    volume = models.IntegerField(default=None, null=True)
+    splits = models.BigIntegerField(default=None, null=True)
+    volume = models.BigIntegerField(default=None, null=True)
 
 
 class Fundamentals(models.Model):
