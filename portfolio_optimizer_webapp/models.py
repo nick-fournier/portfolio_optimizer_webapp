@@ -170,3 +170,16 @@ class Scores(models.Model):
     # def save(self, *args, **kwargs):
     #     self.fiscal_year = get_fiscal_year(self.as_of_date)
     #     super(Scores, self).save(*args, **kwargs)
+    
+class ExpectedReturns(models.Model):
+    
+    class Meta:
+        db_table = 'expected_returns'
+    
+    fundamentals = models.OneToOneField(Fundamentals, on_delete=models.CASCADE, primary_key=True)    
+    # symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
+    # date = models.DateField()
+    last_close = models.DecimalField(max_digits=16, decimal_places=6)
+    forecasted_close = models.DecimalField(max_digits=16, decimal_places=6)
+    expected_return = models.DecimalField(max_digits=16, decimal_places=6)
+    variance = models.DecimalField(max_digits=16, decimal_places=6, null=True, default=None)
