@@ -69,17 +69,6 @@ class SecurityList(models.Model):
     def __str__(self):
         return self.symbol
 
-class Portfolio(models.Model):
-    
-    class Meta:
-        db_table = 'portfolio'
-
-    symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
-    allocation = models.DecimalField(max_digits=10, null=True, decimal_places=6)
-    shares = models.IntegerField(default=None, null=True)
-    fiscal_year = models.IntegerField(default=None, null=True)
-
-
 class SecurityPrice(models.Model):
     
     class Meta:
@@ -106,6 +95,8 @@ class Fundamentals(models.Model):
         
     symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
     as_of_date = models.DateField()
+    # year = models.IntegerField(default=None, null=True)
+    # quarter = models.IntegerField(default=None, null=True)
     period_type = models.CharField()
     net_income = models.BigIntegerField(default=None, null=True)
     net_income_common_stockholders = models.BigIntegerField(default=None, null=True)
@@ -134,6 +125,16 @@ class Fundamentals(models.Model):
         super(Fundamentals, self).save(*args, **kwargs)
 
 
+class Portfolio(models.Model):
+    
+    class Meta:
+        db_table = 'portfolio'
+
+    fundamentals = models.OneToOneField(Fundamentals, on_delete=models.CASCADE, primary_key=True)
+    allocation = models.DecimalField(max_digits=10, decimal_places=6)
+    shares = models.IntegerField()
+
+
 class Scores(models.Model):
     
     class Meta:
@@ -141,35 +142,21 @@ class Scores(models.Model):
         # unique_together = ('symbol', 'as_of_date', 'period_type', 'currency_code')
     
     fundamentals = models.OneToOneField(Fundamentals, on_delete=models.CASCADE, primary_key=True)
-    # symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
-    # as_of_date = models.DateField()
-    # period_type = models.CharField()
-    # fiscal_year = models.IntegerField(default=None, null=True)
-    
-    roa = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    delta_cash = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    delta_roa = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    accruals = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    delta_long_lev_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    delta_current_lev_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    delta_shares = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    delta_gross_margin = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    delta_asset_turnover = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    cash_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    eps = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
+    roa = models.FloatField(default=None, null=True)
+    delta_cash = models.FloatField(default=None, null=True)
+    delta_roa = models.FloatField(default=None, null=True)
+    accruals = models.FloatField(default=None, null=True)
+    delta_long_lev_ratio = models.FloatField(default=None, null=True)
+    delta_current_lev_ratio = models.FloatField(default=None, null=True)
+    delta_shares = models.FloatField(default=None, null=True)
+    delta_gross_margin = models.FloatField(default=None, null=True)
+    delta_asset_turnover = models.FloatField(default=None, null=True)
+    cash_ratio = models.FloatField(default=None, null=True)
+    eps = models.FloatField(default=None, null=True)
     book_value = models.BigIntegerField(default=None, null=True)
     pf_score = models.IntegerField(default=None, null=True)
-    pf_score_weighted = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-    # yearly_close = models.DecimalField(max_digits=17, null=True, decimal_places=2)
-    # yearly_variance = models.DecimalField(max_digits=17, null=True, decimal_places=2)
+    pf_score_weighted = models.FloatField(default=None, null=True)
 
-    # def save(self, *args, **kwargs):
-    #     self.fiscal_year = get_fiscal_year(self.date)
-    #     super(Scores, self).save(*args, **kwargs)
-    
-    # def save(self, *args, **kwargs):
-    #     self.fiscal_year = get_fiscal_year(self.as_of_date)
-    #     super(Scores, self).save(*args, **kwargs)
     
 class ExpectedReturns(models.Model):
     
@@ -182,4 +169,4 @@ class ExpectedReturns(models.Model):
     last_close = models.DecimalField(max_digits=16, decimal_places=6)
     forecasted_close = models.DecimalField(max_digits=16, decimal_places=6)
     expected_return = models.DecimalField(max_digits=16, decimal_places=6)
-    variance = models.DecimalField(max_digits=16, decimal_places=6, null=True, default=None)
+    variance = models.FloatField(default=None, null=True)
