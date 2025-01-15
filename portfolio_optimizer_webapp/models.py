@@ -130,6 +130,7 @@ class Portfolio(models.Model):
     class Meta:
         db_table = 'portfolio'
 
+    symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
     fundamentals = models.OneToOneField(Fundamentals, on_delete=models.CASCADE, primary_key=True)
     allocation = models.DecimalField(max_digits=10, decimal_places=6)
     shares = models.IntegerField()
@@ -142,6 +143,7 @@ class Scores(models.Model):
         # unique_together = ('symbol', 'as_of_date', 'period_type', 'currency_code')
     
     fundamentals = models.OneToOneField(Fundamentals, on_delete=models.CASCADE, primary_key=True)
+    symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
     roa = models.FloatField(default=None, null=True)
     delta_cash = models.FloatField(default=None, null=True)
     delta_roa = models.FloatField(default=None, null=True)
@@ -164,7 +166,7 @@ class ExpectedReturns(models.Model):
         db_table = 'expected_returns'
     
     fundamentals = models.OneToOneField(Fundamentals, on_delete=models.CASCADE, primary_key=True)    
-    # symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
+    symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
     # date = models.DateField()
     last_close = models.DecimalField(max_digits=16, decimal_places=6)
     forecasted_close = models.DecimalField(max_digits=16, decimal_places=6)
