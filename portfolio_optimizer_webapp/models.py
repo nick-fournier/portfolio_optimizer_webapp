@@ -95,6 +95,7 @@ class Fundamentals(models.Model):
         
     symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
     as_of_date = models.DateField()
+    quarter = models.IntegerField(default=None, null=True)
     # year = models.IntegerField(default=None, null=True)
     # quarter = models.IntegerField(default=None, null=True)
     period_type = models.CharField()
@@ -118,7 +119,6 @@ class Fundamentals(models.Model):
     pe_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     peg_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
     ps_ratio = models.DecimalField(max_digits=16, default=None, null=True, decimal_places=6)
-
 
     def save(self, *args, **kwargs):
         self.fiscal_year = get_fiscal_year(self.as_of_date)
