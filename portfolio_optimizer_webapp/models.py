@@ -95,9 +95,8 @@ class Fundamentals(models.Model):
         
     symbol = models.ForeignKey(SecurityList, on_delete=models.CASCADE, db_column='symbol')
     as_of_date = models.DateField()
+    year = models.IntegerField(default=None, null=True)
     quarter = models.IntegerField(default=None, null=True)
-    # year = models.IntegerField(default=None, null=True)
-    # quarter = models.IntegerField(default=None, null=True)
     period_type = models.CharField()
     net_income = models.BigIntegerField(default=None, null=True)
     net_income_common_stockholders = models.BigIntegerField(default=None, null=True)
